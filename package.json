@@ -1,0 +1,13 @@
+{
+  "name": "city-planner",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/web",
+    "test": "npm run test -w apps/web",
+    "test:e2e": "npm run test:e2e -w apps/web"
+  }
+}
