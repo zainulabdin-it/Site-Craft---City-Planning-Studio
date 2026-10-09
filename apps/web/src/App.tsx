@@ -582,9 +582,23 @@ export default function App() {
                 }}
               >
                 <Icon size={19} />
-                <span>{label}</span>
               </button>
             ))}
+            <i />
+            <button
+              aria-label="Frame project"
+              title="Frame project"
+              onClick={() => frame()}
+            >
+              <Focus size={19} />
+            </button>
+            <button
+              aria-label="Reset view"
+              title="Reset view"
+              onClick={() => frame(undefined, "top")}
+            >
+              <RotateCcw size={19} />
+            </button>
             <i />
             <button
               aria-label="Undo"
@@ -601,6 +615,28 @@ export default function App() {
               onClick={() => history(false)}
             >
               <Redo2 size={19} />
+            </button>
+            <i />
+            <button
+              aria-label="Delete selected"
+              title="Delete selected"
+              disabled={!current}
+              onClick={() => {
+                if (current && edit([], [current.id], "Delete object"))
+                  setSelected("");
+              }}
+            >
+              <Trash2 size={19} />
+            </button>
+            <button
+              aria-label="Duplicate selected"
+              title="Duplicate selected"
+              disabled={!current}
+              onClick={() =>
+                setError("Duplicate is available from the inspector.")
+              }
+            >
+              <Copy size={19} />
             </button>
           </div>
           <div className="zoom-controls" aria-label="Map zoom controls">
@@ -657,8 +693,16 @@ export default function App() {
             </div>
           )}
           <div className="map-bottom">
-            <span>{context}</span>
-            <span>Design boundary ≠ cadastral boundary</span>
+            <span>
+              Coords: {project.origin[0].toFixed(5)},{" "}
+              {project.origin[1].toFixed(5)}
+            </span>
+            <span>Zoom: 2.46</span>
+            <span>Eye alt: 12,424 km</span>
+            <span>Bearing: 0.0°</span>
+            <span>Pitch: 0.0°</span>
+            <span className="map-context">{context}</span>
+            <span className="diagnostics">⚙ Diagnostics: 0</span>
           </div>
         </main>
         <aside className="right">

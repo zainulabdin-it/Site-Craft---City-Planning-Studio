@@ -395,36 +395,36 @@ main {
 }
 .toolbar {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 75px;
+  left: 14px;
+  top: 74px;
   display: flex;
+  flex-direction: column;
   background: #fff;
-  padding: 5px;
+  padding: 5px 4px;
   gap: 2px;
-  border-radius: 9px;
+  border-radius: 9px 9px 5px 5px;
   box-shadow: 0 4px 24px #17342926;
-  max-width: 96%;
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
   z-index: 4;
 }
 .toolbar button {
-  flex-direction: column;
   border: 0;
   background: transparent;
-  padding: 9px 10px;
-  gap: 5px;
-}
-.toolbar button span {
-  font-size: 9px;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border-radius: 6px;
 }
 .toolbar button.active {
   background: #e4f1eb;
   color: #17755b;
 }
 .toolbar i {
-  width: 1px;
+  width: 30px;
+  height: 1px;
   background: #e5ebe6;
-  margin: 8px 3px;
+  margin: 3px auto;
 }
 .zoom-controls {
   position: absolute;
@@ -477,11 +477,19 @@ main {
   right: 0;
   background: #f7faf4ef;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 10px;
   padding: 9px 15px;
   font-size: 9px;
-  color: #6a7e71;
+  color: #536d60;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.map-context {
+  margin-left: auto;
+  color: #7c9185;
+}
+.diagnostics {
+  color: #c53b36;
 }
 .cesium-viewer-bottom {
   bottom: 35px !important;
