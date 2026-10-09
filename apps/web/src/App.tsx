@@ -27,6 +27,8 @@ import {
   Maximize,
   Compass,
   Globe2,
+  PanelLeftClose,
+  PanelRightClose,
 } from "lucide-react";
 import {
   newProject,
@@ -102,6 +104,9 @@ export default function App() {
     [layerOrder, setLayerOrder] = useState<Kind[]>([...kinds]),
     [engine, setEngine] = useState("Cesium 3D"),
     [layersOpen, setLayersOpen] = useState(true),
+    [leftOpen, setLeftOpen] = useState(true),
+    [rightOpen, setRightOpen] = useState(false),
+    [toolsOpen, setToolsOpen] = useState(true),
     [status, setStatus] = useState(boot.status),
     [error, setError] = useState(boot.error),
     [context, setContext] = useState("Loading map…"),
@@ -325,19 +330,52 @@ export default function App() {
           <span className="studio">PLANNING STUDIO</span>
         </div>
         <nav className="top-nav" aria-label="Application menu">
-          <button onClick={() => { setName("New Christchurch site"); setDialog("new"); }}><FolderOpen size={16} /> Project</button>
-          <button onClick={() => setTool("select")}><MousePointer2 size={16} /> Edit</button>
-          <button onClick={() => setAction({ type: "top", seq: Date.now() })}><Compass size={16} /> View</button>
-          <button onClick={() => setContext("Add Data · GeoJSON and project files supported")}><Plus size={16} /> Add Data</button>
-          <button onClick={() => setContext("Processing tools · surface generation ready")}>⚙ Processing</button>
-          <button onClick={() => setContext("Controls · use the tool palette and map controls")}>☷ Controls</button>
-          <button onClick={() => setContext("Plugins · extension point")}>✣ Plugins</button>
-          <button onClick={() => setContext("Settings · local project preferences")}>⚙ Settings</button>
-          <button onClick={() => setContext("Help · draw a boundary to begin")}>? Help</button>
+          <button
+            onClick={() => {
+              setName("New Christchurch site");
+              setDialog("new");
+            }}
+          >
+            <FolderOpen size={16} /> Project
+          </button>
+          <button onClick={() => setTool("select")}>
+            <MousePointer2 size={16} /> Edit
+          </button>
+          <button onClick={() => setAction({ type: "top", seq: Date.now() })}>
+            <Compass size={16} /> View
+          </button>
         </nav>
         <div className="project-title">
           {project.name}
           <span> / {project.scenarioName}</span>
+        </div>
+        <div className="header-map-actions">
+          <span className="pill">
+            <span className="live-dot" /> CONCEPT DESIGN
+          </span>
+          <form className="location-search" onSubmit={searchMap}>
+            <label>
+              <Search size={15} />
+              <input
+                aria-label="Search map location in header"
+                placeholder="Search in New Zealand"
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={searching || locationQuery.trim().length < 2}
+            >
+              {searching ? "…" : "Search"}
+            </button>
+          </form>
+          <button
+            className="return-project"
+            onClick={() => frame(undefined, "top")}
+          >
+            <RotateCcw size={14} /> Return to project
+          </button>
         </div>
         <span className={`save-state ${status === "Saved" ? "saved" : ""}`}>
           ● {status}
@@ -363,158 +401,194 @@ export default function App() {
           <Save size={15} /> Save project
         </button>
       </header>
-      <div className="workspace">
-        <aside className="left">
-          <div className="eyebrow">
-            WORKSPACE <span>01</span>
-          </div>
-          <h2>Your next place.</h2>
-          <p className="muted">Shape a proposal in its real-world context.</p>
-          <div className="project-buttons">
+      <div
+        className={`workspace ${leftOpen ? "left-open" : "left-collapsed"} ${rightOpen ? "right-open" : "right-collapsed"}`}
+      >
+        {leftOpen ? (
+          <aside className="left">
             <button
-              onClick={() => {
-                setName("New Christchurch site");
-                setDialog("new");
-              }}
+              className="panel-collapse"
+              aria-label="Collapse layers panel"
+              title="Collapse layers panel"
+              onClick={() => setLeftOpen(false)}
             >
-              <Plus size={14} />
-              New
+              <PanelLeftClose size={16} />
             </button>
-            <button onClick={open}>Open project</button>
-          </div>
-          <label className="field">
-            Save destination
-            <select
-              value={storage}
-              onChange={(e) => setStorage(e.target.value as "local" | "server")}
+            <div className="eyebrow">
+              WORKSPACE <span>01</span>
+            </div>
+            <h2>Your next place.</h2>
+            <p className="muted">Shape a proposal in its real-world context.</p>
+            <div className="project-buttons">
+              <button
+                onClick={() => {
+                  setName("New Christchurch site");
+                  setDialog("new");
+                }}
+              >
+                <Plus size={14} />
+                New
+              </button>
+              <button onClick={open}>Open project</button>
+            </div>
+            <label className="field">
+              Save destination
+              <select
+                value={storage}
+                onChange={(e) =>
+                  setStorage(e.target.value as "local" | "server")
+                }
+              >
+                <option value="local">This browser</option>
+                <option value="server">Local API server</option>
+              </select>
+            </label>
+            <button
+              className="section-title layer-heading collapsible"
+              onClick={() => setLayersOpen(!layersOpen)}
+              aria-expanded={layersOpen}
             >
-              <option value="local">This browser</option>
-              <option value="server">Local API server</option>
-            </select>
-          </label>
-          <button
-            className="section-title layer-heading collapsible"
-            onClick={() => setLayersOpen(!layersOpen)}
-            aria-expanded={layersOpen}
-          >
-            <Layers size={15} /> Layers{" "}
-            <span>
-              {project.objects.length} {layersOpen ? "⌃" : "⌄"}
-            </span>
-          </button>
-          {layersOpen && (
-            <div className="layers">
-              {layerOrder.map((k, index) => {
-                const Icon = icons[k];
-                return (
-                  <div key={k} className="layer-card">
-                    <div className="layer">
-                      <input
-                        aria-label={`Show ${k} layer`}
-                        type="checkbox"
-                        checked={visible[k]}
-                        onChange={(e) =>
-                          setVisible({ ...visible, [k]: e.target.checked })
-                        }
-                      />
-                      <Icon size={15} />
-                      <span>
-                        {k === "boundary"
-                          ? "Site boundary"
-                          : k[0].toUpperCase() + k.slice(1)}
-                      </span>
-                      <small>
-                        {project.objects.filter((o) => o.kind === k).length}
-                      </small>
-                      <button
-                        className="icon-button"
-                        aria-label={`Move ${k} layer up`}
-                        disabled={index === 0}
-                        onClick={() => {
-                          const next = [...layerOrder];
-                          [next[index - 1], next[index]] = [
-                            next[index],
-                            next[index - 1],
-                          ];
-                          setLayerOrder(next);
-                        }}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        className="icon-button"
-                        aria-label={`Move ${k} layer down`}
-                        disabled={index === layerOrder.length - 1}
-                        onClick={() => {
-                          const next = [...layerOrder];
-                          [next[index], next[index + 1]] = [
-                            next[index + 1],
-                            next[index],
-                          ];
-                          setLayerOrder(next);
-                        }}
-                      >
-                        ↓
-                      </button>
+              <Layers size={15} /> Layers{" "}
+              <span>
+                {project.objects.length} {layersOpen ? "⌃" : "⌄"}
+              </span>
+            </button>
+            {layersOpen && (
+              <div className="layers">
+                {layerOrder.map((k, index) => {
+                  const Icon = icons[k];
+                  return (
+                    <div key={k} className="layer-card">
+                      <div className="layer">
+                        <input
+                          aria-label={`Show ${k} layer`}
+                          type="checkbox"
+                          checked={visible[k]}
+                          onChange={(e) =>
+                            setVisible({ ...visible, [k]: e.target.checked })
+                          }
+                        />
+                        <Icon size={15} />
+                        <span>
+                          {k === "boundary"
+                            ? "Site boundary"
+                            : k[0].toUpperCase() + k.slice(1)}
+                        </span>
+                        <small>
+                          {project.objects.filter((o) => o.kind === k).length}
+                        </small>
+                        <button
+                          className="icon-button"
+                          aria-label={`Move ${k} layer up`}
+                          disabled={index === 0}
+                          onClick={() => {
+                            const next = [...layerOrder];
+                            [next[index - 1], next[index]] = [
+                              next[index],
+                              next[index - 1],
+                            ];
+                            setLayerOrder(next);
+                          }}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label={`Move ${k} layer down`}
+                          disabled={index === layerOrder.length - 1}
+                          onClick={() => {
+                            const next = [...layerOrder];
+                            [next[index], next[index + 1]] = [
+                              next[index + 1],
+                              next[index],
+                            ];
+                            setLayerOrder(next);
+                          }}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                      <label className="layer-opacity">
+                        Opacity{" "}
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={opacity[k]}
+                          style={{
+                            background: `linear-gradient(to right, #2563eb ${opacity[k] * 100}%, #dbeafe ${opacity[k] * 100}%)`,
+                          }}
+                          onChange={(e) =>
+                            setOpacity({
+                              ...opacity,
+                              [k]: Number(e.target.value),
+                            })
+                          }
+                        />
+                        <span>{Math.round(opacity[k] * 100)}%</span>
+                      </label>
                     </div>
-                    <label className="layer-opacity">
-                      Opacity{" "}
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={opacity[k]}
-                        onChange={(e) =>
-                          setOpacity({
-                            ...opacity,
-                            [k]: Number(e.target.value),
-                          })
-                        }
-                      />
-                      <span>{Math.round(opacity[k] * 100)}%</span>
-                    </label>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="section-title">
+              DESIGN OBJECTS <span>{project.objects.length}</span>
+            </div>
+            <div className="object-list">
+              {project.objects.map((o) => {
+                const Icon = icons[o.kind];
+                return (
+                  <button
+                    key={o.id}
+                    className={selected === o.id ? "object active" : "object"}
+                    onClick={() => {
+                      setSelected(o.id);
+                      setTool("select");
+                    }}
+                  >
+                    <Icon size={14} />
+                    <span>{o.name}</span>
+                    <ChevronRight size={13} />
+                  </button>
                 );
               })}
+              {!project.objects.length && (
+                <p className="muted">Start by drawing your site boundary.</p>
+              )}
             </div>
-          )}
-          <div className="section-title">
-            DESIGN OBJECTS <span>{project.objects.length}</span>
-          </div>
-          <div className="object-list">
-            {project.objects.map((o) => {
-              const Icon = icons[o.kind];
-              return (
-                <button
-                  key={o.id}
-                  className={selected === o.id ? "object active" : "object"}
-                  onClick={() => {
-                    setSelected(o.id);
-                    setTool("select");
-                  }}
-                >
-                  <Icon size={14} />
-                  <span>{o.name}</span>
-                  <ChevronRight size={13} />
-                </button>
-              );
-            })}
-            {!project.objects.length && (
-              <p className="muted">Start by drawing your site boundary.</p>
-            )}
-          </div>
-          <button onClick={() => frame()} className="wide">
-            <Focus size={15} /> Frame whole project
-          </button>
-          <div className="location-card">
-            <MapPin size={17} />
-            <div>
-              <b>Christchurch, NZ</b>
-              <small>43.5321° S · 172.6362° E</small>
+            <button onClick={() => frame()} className="wide">
+              <Focus size={15} /> Frame whole project
+            </button>
+            <div className="location-card">
+              <MapPin size={17} />
+              <div>
+                <b>Christchurch, NZ</b>
+                <small>43.5321° S · 172.6362° E</small>
+              </div>
             </div>
+          </aside>
+        ) : (
+          <div className="collapsed-rail left-rail">
+            <button
+              className="panel-tab"
+              aria-label="Open project browser"
+              onClick={() => setLeftOpen(true)}
+            >
+              <FolderOpen size={16} />
+              <span>Browser</span>
+            </button>
+            <button
+              className="panel-tab"
+              aria-label="Open layers panel"
+              onClick={() => setLeftOpen(true)}
+            >
+              <Layers size={16} />
+              <span>Layers</span>
+            </button>
           </div>
-        </aside>
+        )}
         <main>
           <Viewport
             project={project}
@@ -583,89 +657,108 @@ export default function App() {
               </button>
             </div>
           </div>
-          <div className="toolbar">
-            {(
-              [
-                ["select", MousePointer2, "Select"],
-                ["boundary", Pentagon, "Boundary"],
-                ["road", Route, "Road"],
-                ["building", Building2, "Building"],
-                ["plot", Pentagon, "Plot"],
-                ["move", Move, "Move"],
-              ] as const
-            ).map(([t, Icon, label]) => (
+          {toolsOpen ? (
+            <div className="toolbar">
               <button
-                key={t}
-                className={tool === t ? "active" : ""}
-                title={label}
-                aria-label={label}
+                aria-label="Collapse tools"
+                title="Collapse tools"
+                onClick={() => setToolsOpen(false)}
+              >
+                <X size={19} />
+              </button>
+              {(
+                [
+                  ["select", MousePointer2, "Select"],
+                  ["boundary", Pentagon, "Boundary"],
+                  ["road", Route, "Road"],
+                  ["building", Building2, "Building"],
+                  ["plot", Pentagon, "Plot"],
+                  ["move", Move, "Move"],
+                ] as const
+              ).map(([t, Icon, label]) => (
+                <button
+                  key={t}
+                  className={tool === t ? "active" : ""}
+                  title={label}
+                  aria-label={label}
+                  onClick={() => {
+                    if (t === "move" && current?.kind === "boundary") {
+                      setError("Edit the boundary vertices in the inspector.");
+                      return;
+                    }
+                    setTool(t);
+                    setDraft([]);
+                  }}
+                >
+                  <Icon size={19} />
+                </button>
+              ))}
+              <i />
+              <button
+                aria-label="Frame project"
+                title="Frame project"
+                onClick={() => frame()}
+              >
+                <Focus size={19} />
+              </button>
+              <button
+                aria-label="Reset view"
+                title="Reset view"
+                onClick={() => frame(undefined, "top")}
+              >
+                <RotateCcw size={19} />
+              </button>
+              <i />
+              <button
+                aria-label="Undo"
+                title="Undo (Ctrl+Z)"
+                disabled={!undo.length}
+                onClick={() => history(true)}
+              >
+                <Undo2 size={19} />
+              </button>
+              <button
+                aria-label="Redo"
+                title="Redo (Ctrl+Shift+Z)"
+                disabled={!redo.length}
+                onClick={() => history(false)}
+              >
+                <Redo2 size={19} />
+              </button>
+              <i />
+              <button
+                aria-label="Delete selected"
+                title="Delete selected"
+                disabled={!current}
                 onClick={() => {
-                  if (t === "move" && current?.kind === "boundary") {
-                    setError("Edit the boundary vertices in the inspector.");
-                    return;
-                  }
-                  setTool(t);
-                  setDraft([]);
+                  if (current && edit([], [current.id], "Delete object"))
+                    setSelected("");
                 }}
               >
-                <Icon size={19} />
+                <Trash2 size={19} />
               </button>
-            ))}
-            <i />
+              <button
+                aria-label="Duplicate selected"
+                title="Duplicate selected"
+                disabled={!current}
+                onClick={() =>
+                  setError("Duplicate is available from the inspector.")
+                }
+              >
+                <Copy size={19} />
+              </button>
+            </div>
+          ) : (
             <button
-              aria-label="Frame project"
-              title="Frame project"
-              onClick={() => frame()}
+              className="tools-tab"
+              aria-label="Open tools"
+              title="Open tools"
+              onClick={() => setToolsOpen(true)}
             >
-              <Focus size={19} />
+              <Move size={18} />
+              <span>Tools</span>
             </button>
-            <button
-              aria-label="Reset view"
-              title="Reset view"
-              onClick={() => frame(undefined, "top")}
-            >
-              <RotateCcw size={19} />
-            </button>
-            <i />
-            <button
-              aria-label="Undo"
-              title="Undo (Ctrl+Z)"
-              disabled={!undo.length}
-              onClick={() => history(true)}
-            >
-              <Undo2 size={19} />
-            </button>
-            <button
-              aria-label="Redo"
-              title="Redo (Ctrl+Shift+Z)"
-              disabled={!redo.length}
-              onClick={() => history(false)}
-            >
-              <Redo2 size={19} />
-            </button>
-            <i />
-            <button
-              aria-label="Delete selected"
-              title="Delete selected"
-              disabled={!current}
-              onClick={() => {
-                if (current && edit([], [current.id], "Delete object"))
-                  setSelected("");
-              }}
-            >
-              <Trash2 size={19} />
-            </button>
-            <button
-              aria-label="Duplicate selected"
-              title="Duplicate selected"
-              disabled={!current}
-              onClick={() =>
-                setError("Duplicate is available from the inspector.")
-              }
-            >
-              <Copy size={19} />
-            </button>
-          </div>
+          )}
           <div className="zoom-controls" aria-label="Map zoom controls">
             <button
               aria-label="Fullscreen map"
@@ -757,111 +850,130 @@ export default function App() {
             <span className="diagnostics">⚙ Diagnostics: 0</span>
           </div>
         </main>
-        <aside className="right">
-          <div className="eyebrow">
-            INSPECTOR <span>PROPOSAL</span>
-          </div>
-          {current ? (
-            <Properties
-              key={current.id}
-              object={current}
-              onUpdate={updateConnected}
-              onFrame={() => frame(current.id)}
-              onMove={() => {
-                setTool("move");
-                setDraft([]);
-              }}
-              onDelete={() => {
-                if (edit([], [current.id], "Delete object")) setSelected("");
-              }}
-              onDuplicate={() => {
-                if (current.kind === "boundary") {
-                  setError("A project can have only one boundary.");
-                  return;
-                }
-                const o = {
-                  ...current,
-                  id: crypto.randomUUID(),
-                  name: current.name + " copy",
-                  points: current.points.map(
-                    ([x, y]) => [x + 20, y + 20] as Point,
-                  ),
-                  nodeIds: current.nodeIds.map(() => crypto.randomUUID()),
-                };
-                if (edit([o], [], "Duplicate object")) setSelected(o.id);
-              }}
-            />
-          ) : (
-            <div className="empty-inspector">
-              <MousePointer2 size={30} />
-              <h3>Make room for ideas.</h3>
-              <p>
-                Select an object to edit its dimensions, placement and
-                appearance.
-              </p>
-            </div>
-          )}
-          <div className="section-title">
-            ASSET LIBRARY <span>4</span>
-          </div>
-          <p className="muted small">
-            Original low-detail concept placeholders
-          </p>
-          <div className="assets">
-            {(["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
-              const Icon = icons[k];
-              return (
-                <button
-                  key={k}
-                  className={tool === k ? "active" : ""}
-                  onClick={() => {
-                    setTool(k);
-                    setDraft([]);
-                  }}
-                >
-                  <Icon size={24} />
-                  <span>{k[0].toUpperCase() + k.slice(1)}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="export">
+        {rightOpen ? (
+          <aside className="right">
             <button
-              onClick={async () => {
-                try {
-                  await saveToComputer(project);
-                } catch (e) {
-                  setError(`Computer save failed: ${String(e)}`);
-                }
-              }}
+              className="panel-collapse right-collapse"
+              aria-label="Collapse inspector panel"
+              title="Collapse inspector panel"
+              onClick={() => setRightOpen(false)}
             >
-              <Download size={14} /> Save to computer
+              <PanelRightClose size={16} />
             </button>
-            <button onClick={() => download(project, true)}>GeoJSON</button>
-            <button onClick={() => file.current?.click()}>
-              <FolderOpen size={14} /> Open from computer
-            </button>
-            <input
-              hidden
-              ref={file}
-              type="file"
-              accept=".json,application/json"
-              onChange={async (e) => {
-                try {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  if (f.size > 5_000_000)
-                    throw Error("Project file exceeds 5 MB.");
-                  const p = validateProject(JSON.parse(await f.text()));
-                  switchProject(p);
-                } catch (err) {
-                  setError(String(err));
-                }
-                e.target.value = "";
-              }}
-            />
-          </div>
-        </aside>
+            <div className="eyebrow">
+              INSPECTOR <span>PROPOSAL</span>
+            </div>
+            {current ? (
+              <Properties
+                key={current.id}
+                object={current}
+                onUpdate={updateConnected}
+                onFrame={() => frame(current.id)}
+                onMove={() => {
+                  setTool("move");
+                  setDraft([]);
+                }}
+                onDelete={() => {
+                  if (edit([], [current.id], "Delete object")) setSelected("");
+                }}
+                onDuplicate={() => {
+                  if (current.kind === "boundary") {
+                    setError("A project can have only one boundary.");
+                    return;
+                  }
+                  const o = {
+                    ...current,
+                    id: crypto.randomUUID(),
+                    name: current.name + " copy",
+                    points: current.points.map(
+                      ([x, y]) => [x + 20, y + 20] as Point,
+                    ),
+                    nodeIds: current.nodeIds.map(() => crypto.randomUUID()),
+                  };
+                  if (edit([o], [], "Duplicate object")) setSelected(o.id);
+                }}
+              />
+            ) : (
+              <div className="empty-inspector">
+                <MousePointer2 size={30} />
+                <h3>Make room for ideas.</h3>
+                <p>
+                  Select an object to edit its dimensions, placement and
+                  appearance.
+                </p>
+              </div>
+            )}
+            <div className="section-title">
+              ASSET LIBRARY <span>4</span>
+            </div>
+            <p className="muted small">
+              Original low-detail concept placeholders
+            </p>
+            <div className="assets">
+              {(["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
+                const Icon = icons[k];
+                return (
+                  <button
+                    key={k}
+                    className={tool === k ? "active" : ""}
+                    onClick={() => {
+                      setTool(k);
+                      setDraft([]);
+                    }}
+                  >
+                    <Icon size={24} />
+                    <span>{k[0].toUpperCase() + k.slice(1)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="export">
+              <button
+                onClick={async () => {
+                  try {
+                    await saveToComputer(project);
+                  } catch (e) {
+                    setError(`Computer save failed: ${String(e)}`);
+                  }
+                }}
+              >
+                <Download size={14} /> Save to computer
+              </button>
+              <button onClick={() => download(project, true)}>GeoJSON</button>
+              <button onClick={() => file.current?.click()}>
+                <FolderOpen size={14} /> Open from computer
+              </button>
+              <input
+                hidden
+                ref={file}
+                type="file"
+                accept=".json,application/json"
+                onChange={async (e) => {
+                  try {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 5_000_000)
+                      throw Error("Project file exceeds 5 MB.");
+                    const p = validateProject(JSON.parse(await f.text()));
+                    switchProject(p);
+                  } catch (err) {
+                    setError(String(err));
+                  }
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          </aside>
+        ) : (
+          <button
+            className="panel-tab right-tab"
+            aria-label="Open inspector panel"
+            onClick={() => setRightOpen(true)}
+          >
+            <Focus size={16} />
+            <span>Inspector</span>
+          </button>
+        )}
       </div>
       <footer>
         <span>

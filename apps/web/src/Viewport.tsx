@@ -33,7 +33,8 @@ export function Viewport(props: Props) {
   const container = useRef<HTMLDivElement>(null),
     viewer = useRef<C.Viewer | null>(null),
     latest = useRef(props),
-    cache = useRef(new Map<string, DesignObject>());
+    cache = useRef(new Map<string, DesignObject>()),
+    opacityCache = useRef(new Map<string, number>());
   latest.current = props;
   const roadKey = JSON.stringify([
     props.project.origin,
@@ -171,6 +172,7 @@ export function Viewport(props: Props) {
       v.destroy();
       viewer.current = null;
       cache.current.clear();
+      opacityCache.current.clear();
     };
   }, []);
   useEffect(() => {
@@ -201,7 +203,10 @@ export function Viewport(props: Props) {
       }
     for (const o of p.objects) {
       let entity = v.entities.getById(o.id);
-      if (cache.current.get(o.id) !== o) {
+      if (
+        cache.current.get(o.id) !== o ||
+        opacityCache.current.get(o.id) !== props.opacity[o.kind]
+      ) {
         if (entity) v.entities.remove(entity);
         for (let face = 0; face < 4; face++)
           v.entities.removeById(`${o.id}:roof${face}`);
@@ -309,6 +314,7 @@ export function Viewport(props: Props) {
         }
         entity = v.entities.add(e as C.Entity.ConstructorOptions);
         cache.current.set(o.id, o);
+        opacityCache.current.set(o.id, props.opacity[o.kind]);
       }
       entity!.show = props.visible[o.kind];
       for (let face = 0; face < 4; face++) {
