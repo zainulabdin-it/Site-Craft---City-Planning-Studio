@@ -249,9 +249,79 @@ main {
   display: flex;
   justify-content: space-between;
   pointer-events: none;
+  z-index: 5;
 }
 .map-top > * {
   pointer-events: auto;
+}
+.map-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.location-search {
+  position: relative;
+  display: flex;
+  height: 38px;
+  background: #fff;
+  border: 1px solid #dce4dd;
+  border-radius: 6px;
+  box-shadow: 0 3px 15px #20352b16;
+}
+.location-search label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 10px;
+  color: #668076;
+}
+.location-search input {
+  width: 210px;
+  border: 0;
+  outline: 0;
+  color: #31483b;
+  background: transparent;
+}
+.location-search > button,
+.return-project {
+  border-radius: 0 5px 5px 0;
+  border-width: 0 0 0 1px;
+  font-size: 10px;
+}
+.return-project {
+  height: 38px;
+  border: 1px solid #dce4dd;
+  border-radius: 6px;
+  box-shadow: 0 3px 15px #20352b10;
+}
+.location-results {
+  position: absolute;
+  top: 43px;
+  left: 0;
+  width: 350px;
+  padding: 6px;
+  background: white;
+  border: 1px solid #dce4dd;
+  border-radius: 7px;
+  box-shadow: 0 8px 30px #1734292b;
+}
+.location-results button {
+  width: 100%;
+  border: 0;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 11px;
+}
+.location-results button span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.location-results small {
+  display: block;
+  padding: 6px 8px 3px;
+  color: #819187;
+  font-size: 9px;
 }
 .pill {
   background: #ffffffed;
@@ -291,6 +361,7 @@ main {
   border-radius: 9px;
   box-shadow: 0 4px 24px #17342926;
   max-width: 96%;
+  z-index: 4;
 }
 .toolbar button {
   flex-direction: column;

@@ -9,8 +9,12 @@ import {
 } from "./model";
 import { toGeo, toLocal, footprint } from "./geometry";
 export type ViewAction = {
-  type: "frame" | "top" | "perspective";
+  type: "frame" | "top" | "perspective" | "location";
   id?: string;
+  location?: {
+    center: Point;
+    bounds: [number, number, number, number];
+  };
   seq: number;
 };
 interface Props {
@@ -135,12 +139,17 @@ export function Viewport(props: Props) {
       const p = groundAt(e.position);
       if (p) latest.current.onClick(p, objectAt(e.position));
     }, C.ScreenSpaceEventType.LEFT_CLICK);
-    let drag: { id: string; start: C.Cartesian2; end: C.Cartesian2 } | undefined;
+    let drag:
+      { id: string; start: C.Cartesian2; end: C.Cartesian2 } | undefined;
     h.setInputAction((e: { position: C.Cartesian2 }) => {
       const id = objectAt(e.position),
         object = latest.current.project.objects.find((o) => o.id === id);
       if (!id || object?.kind === "boundary") return;
-      drag = { id, start: C.Cartesian2.clone(e.position), end: C.Cartesian2.clone(e.position) };
+      drag = {
+        id,
+        start: C.Cartesian2.clone(e.position),
+        end: C.Cartesian2.clone(e.position),
+      };
     }, C.ScreenSpaceEventType.LEFT_DOWN);
     h.setInputAction((e: { endPosition: C.Cartesian2 }) => {
       if (drag) drag.end = C.Cartesian2.clone(e.endPosition);
@@ -382,6 +391,19 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    if (props.action.type === "location" && props.action.location) {
+      const { center, bounds } = props.action.location,
+        width = Math.max(bounds[2] - bounds[0], 0.01),
+        height = Math.max(bounds[3] - bounds[1], 0.01),
+        rectangle = C.Rectangle.fromDegrees(
+          center[0] - width / 2,
+          center[1] - height / 2,
+          center[0] + width / 2,
+          center[1] + height / 2,
+        );
+      v.camera.flyTo({ destination: rectangle, duration: 1.1 });
+      return;
+    }
     const o = props.project.objects.find((o) => o.id === props.action.id);
     const points = o?.points ||
       props.project.objects.find((o) => o.kind === "boundary")?.points || [

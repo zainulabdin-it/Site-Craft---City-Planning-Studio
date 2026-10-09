@@ -20,6 +20,9 @@ import {
   ChevronRight,
   MapPin,
   X,
+  Search,
+  RotateCcw,
+  FolderOpen,
 } from "lucide-react";
 import {
   newProject,
@@ -46,8 +49,10 @@ import {
   saveServer,
   loadServer,
   download,
+  saveToComputer,
 } from "./persistence";
 import { Viewport, type ViewAction } from "./Viewport";
+import { searchLocations, type LocationResult } from "./geocoding";
 function initial() {
   try {
     const all = listLocal();
@@ -96,7 +101,10 @@ export default function App() {
     [dialog, setDialog] = useState<"new" | "open" | null>(null),
     [projects, setProjects] = useState<Project[]>([]),
     [name, setName] = useState(""),
-    [storage, setStorage] = useState<"local" | "server">("local");
+    [storage, setStorage] = useState<"local" | "server">("local"),
+    [locationQuery, setLocationQuery] = useState(""),
+    [locationResults, setLocationResults] = useState<LocationResult[]>([]),
+    [searching, setSearching] = useState(false);
   const file = useRef<HTMLInputElement>(null),
     version = useRef(0);
   const current = project.objects.find((o) => o.id === selected);
@@ -277,6 +285,29 @@ export default function App() {
       setError(String(e));
     }
   };
+  const searchMap = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearching(true);
+    try {
+      const results = await searchLocations(locationQuery);
+      setLocationResults(results);
+      setError(results.length ? "" : "No matching locations found.");
+    } catch (e) {
+      setLocationResults([]);
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSearching(false);
+    }
+  };
+  const goToLocation = (result: LocationResult) => {
+    setLocationQuery(result.name);
+    setLocationResults([]);
+    setAction({
+      type: "location",
+      location: { center: result.center, bounds: result.bounds },
+      seq: Date.now(),
+    });
+  };
   return (
     <div className="app">
       <header>
@@ -407,10 +438,51 @@ export default function App() {
             action={action}
           />
           <div className="map-top">
-            <span className="pill">
-              <span className="live-dot" />
-              CONCEPT DESIGN
-            </span>
+            <div className="map-actions">
+              <span className="pill">
+                <span className="live-dot" />
+                CONCEPT DESIGN
+              </span>
+              <form className="location-search" onSubmit={searchMap}>
+                <label>
+                  <Search size={15} />
+                  <input
+                    aria-label="Search map location"
+                    placeholder="Search a city or address"
+                    value={locationQuery}
+                    onChange={(e) => setLocationQuery(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  aria-label="Search location"
+                  disabled={searching || locationQuery.trim().length < 2}
+                >
+                  {searching ? "Searching…" : "Search"}
+                </button>
+                {locationResults.length > 0 && (
+                  <div className="location-results">
+                    {locationResults.map((result) => (
+                      <button
+                        type="button"
+                        key={result.id}
+                        onClick={() => goToLocation(result)}
+                      >
+                        <MapPin size={14} />
+                        <span>{result.name}</span>
+                      </button>
+                    ))}
+                    <small>Search data © OpenStreetMap contributors</small>
+                  </div>
+                )}
+              </form>
+              <button
+                className="return-project"
+                onClick={() => frame(undefined, "top")}
+              >
+                <RotateCcw size={14} /> Return to project
+              </button>
+            </div>
             <div className="view-switch">
               <button onClick={() => frame(undefined, "top")}>2D</button>
               <button onClick={() => frame(undefined, "perspective")}>
@@ -576,12 +648,20 @@ export default function App() {
             })}
           </div>
           <div className="export">
-            <button onClick={() => download(project)}>
-              <Download size={14} /> Project JSON
+            <button
+              onClick={async () => {
+                try {
+                  await saveToComputer(project);
+                } catch (e) {
+                  setError(`Computer save failed: ${String(e)}`);
+                }
+              }}
+            >
+              <Download size={14} /> Save to computer
             </button>
             <button onClick={() => download(project, true)}>GeoJSON</button>
             <button onClick={() => file.current?.click()}>
-              Import project JSON
+              <FolderOpen size={14} /> Open from computer
             </button>
             <input
               hidden

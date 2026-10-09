@@ -72,3 +72,41 @@ export function download(p: Project, geo = false) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+interface WritableProjectFile {
+  write(data: string): Promise<void>;
+  close(): Promise<void>;
+}
+interface ProjectFileHandle {
+  createWritable(): Promise<WritableProjectFile>;
+}
+
+export async function saveToComputer(p: Project) {
+  const filename = `${p.name.replace(/[^a-z0-9]/gi, "-")}.json`,
+    picker = (
+      window as typeof window & {
+        showSaveFilePicker?: (options: unknown) => Promise<ProjectFileHandle>;
+      }
+    ).showSaveFilePicker;
+  if (!picker) {
+    download(p);
+    return;
+  }
+  try {
+    const handle = await picker({
+        suggestedName: filename,
+        types: [
+          {
+            description: "Sitecraft project",
+            accept: { "application/json": [".json"] },
+          },
+        ],
+      }),
+      writable = await handle.createWritable();
+    await writable.write(JSON.stringify(p, null, 2));
+    await writable.close();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return;
+    throw error;
+  }
+}

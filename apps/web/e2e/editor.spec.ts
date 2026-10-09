@@ -4,6 +4,9 @@ test("real Cesium editor: draw, connect, edit, persist, reload and export", asyn
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() =>
+    Object.defineProperty(window, "showSaveFilePicker", { value: undefined }),
+  );
   const start = Date.now();
   await page.goto("/");
   await expect(page.locator("canvas")).toBeVisible();
@@ -47,8 +50,10 @@ test("real Cesium editor: draw, connect, edit, persist, reload and export", asyn
   await page.getByLabel("Floors", { exact: true }).fill("4");
   await page.getByLabel("Floors", { exact: true }).press("Enter");
   await expect(page.getByText("12.0 m", { exact: true })).toBeVisible();
-  await page.getByRole('combobox', {name:'Roof',exact:true}).selectOption('pitched');
-  await page.getByRole('button', {name:'Undo',exact:true}).click();
+  await page
+    .getByRole("combobox", { name: "Roof", exact: true })
+    .selectOption("pitched");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(page.getByLabel("Floors", { exact: true })).toHaveValue("2");
   await page.getByRole("button", { name: "Redo", exact: true }).click();
@@ -82,8 +87,29 @@ test("real Cesium editor: draw, connect, edit, persist, reload and export", asyn
   await page.reload();
   await expect(page.locator(".project-title")).toContainText("Acceptance site");
   await expect(page.locator(".object-list .object")).toHaveCount(7);
+  await page.route("https://nominatim.openstreetmap.org/search?**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          place_id: 1,
+          display_name: "Wellington, New Zealand",
+          lat: "-41.2866",
+          lon: "174.7756",
+          boundingbox: ["-41.35", "-41.2", "174.7", "174.85"],
+        },
+      ]),
+    }),
+  );
+  await page.getByLabel("Search map location").fill("Wellington");
+  await page.getByRole("button", { name: "Search location" }).click();
+  await page.getByRole("button", { name: "Wellington, New Zealand" }).click();
+  await page.getByRole("button", { name: "Return to project" }).click();
+  await expect(page.locator(".object-list .object")).toHaveCount(7);
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Project JSON", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save to computer", exact: true })
+    .click();
   expect((await downloadPromise).suggestedFilename()).toContain(".json");
   await page.getByLabel("Save destination").selectOption("server");
   await page.getByRole("button", { name: "Save project", exact: true }).click();
@@ -94,9 +120,9 @@ test("real Cesium editor: draw, connect, edit, persist, reload and export", asyn
   expect(persisted.objects).toEqual(before.objects);
   expect(persisted.revision).toBe(1);
   await page.screenshot({ path: "../../docs/editor-acceptance.png" });
-  await page.getByRole('button',{name:'3D',exact:true}).click();
+  await page.getByRole("button", { name: "3D", exact: true }).click();
   await page.waitForTimeout(1200);
-  await page.screenshot({path:'../../docs/editor-3d.png'});
+  await page.screenshot({ path: "../../docs/editor-3d.png" });
   expect(errors).toEqual([]);
   console.log(
     `Acceptance workflow duration: ${Date.now() - start} ms; browser ${page.context().browser()?.version()}; ${persisted.objects.length} objects`,
