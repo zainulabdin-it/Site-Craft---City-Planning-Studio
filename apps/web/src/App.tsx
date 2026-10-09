@@ -24,6 +24,9 @@ import {
   RotateCcw,
   FolderOpen,
   Minus,
+  Maximize,
+  Compass,
+  Globe2,
 } from "lucide-react";
 import {
   newProject,
@@ -98,6 +101,7 @@ export default function App() {
     ),
     [layerOrder, setLayerOrder] = useState<Kind[]>([...kinds]),
     [engine, setEngine] = useState("Cesium 3D"),
+    [layersOpen, setLayersOpen] = useState(true),
     [status, setStatus] = useState(boot.status),
     [error, setError] = useState(boot.error),
     [context, setContext] = useState("Loading map…"),
@@ -320,6 +324,17 @@ export default function App() {
           <span className="brand-mark">s</span>sitecraft
           <span className="studio">PLANNING STUDIO</span>
         </div>
+        <nav className="top-nav" aria-label="Application menu">
+          <button onClick={() => { setName("New Christchurch site"); setDialog("new"); }}><FolderOpen size={16} /> Project</button>
+          <button onClick={() => setTool("select")}><MousePointer2 size={16} /> Edit</button>
+          <button onClick={() => setAction({ type: "top", seq: Date.now() })}><Compass size={16} /> View</button>
+          <button onClick={() => setContext("Add Data · GeoJSON and project files supported")}><Plus size={16} /> Add Data</button>
+          <button onClick={() => setContext("Processing tools · surface generation ready")}>⚙ Processing</button>
+          <button onClick={() => setContext("Controls · use the tool palette and map controls")}>☷ Controls</button>
+          <button onClick={() => setContext("Plugins · extension point")}>✣ Plugins</button>
+          <button onClick={() => setContext("Settings · local project preferences")}>⚙ Settings</button>
+          <button onClick={() => setContext("Help · draw a boundary to begin")}>? Help</button>
+        </nav>
         <div className="project-title">
           {project.name}
           <span> / {project.scenarioName}</span>
@@ -377,81 +392,93 @@ export default function App() {
               <option value="server">Local API server</option>
             </select>
           </label>
-          <div className="section-title layer-heading">
-            <Layers size={15} /> Layers <span>{project.objects.length}</span>
-          </div>
-          <div className="layers">
-            {layerOrder.map((k, index) => {
-              const Icon = icons[k];
-              return (
-                <div key={k} className="layer-card">
-                  <div className="layer">
-                    <input
-                      aria-label={`Show ${k} layer`}
-                      type="checkbox"
-                      checked={visible[k]}
-                      onChange={(e) =>
-                        setVisible({ ...visible, [k]: e.target.checked })
-                      }
-                    />
-                    <Icon size={15} />
-                    <span>
-                      {k === "boundary"
-                        ? "Site boundary"
-                        : k[0].toUpperCase() + k.slice(1)}
-                    </span>
-                    <small>
-                      {project.objects.filter((o) => o.kind === k).length}
-                    </small>
-                    <button
-                      className="icon-button"
-                      aria-label={`Move ${k} layer up`}
-                      disabled={index === 0}
-                      onClick={() => {
-                        const next = [...layerOrder];
-                        [next[index - 1], next[index]] = [
-                          next[index],
-                          next[index - 1],
-                        ];
-                        setLayerOrder(next);
-                      }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={`Move ${k} layer down`}
-                      disabled={index === layerOrder.length - 1}
-                      onClick={() => {
-                        const next = [...layerOrder];
-                        [next[index], next[index + 1]] = [
-                          next[index + 1],
-                          next[index],
-                        ];
-                        setLayerOrder(next);
-                      }}
-                    >
-                      ↓
-                    </button>
+          <button
+            className="section-title layer-heading collapsible"
+            onClick={() => setLayersOpen(!layersOpen)}
+            aria-expanded={layersOpen}
+          >
+            <Layers size={15} /> Layers{" "}
+            <span>
+              {project.objects.length} {layersOpen ? "⌃" : "⌄"}
+            </span>
+          </button>
+          {layersOpen && (
+            <div className="layers">
+              {layerOrder.map((k, index) => {
+                const Icon = icons[k];
+                return (
+                  <div key={k} className="layer-card">
+                    <div className="layer">
+                      <input
+                        aria-label={`Show ${k} layer`}
+                        type="checkbox"
+                        checked={visible[k]}
+                        onChange={(e) =>
+                          setVisible({ ...visible, [k]: e.target.checked })
+                        }
+                      />
+                      <Icon size={15} />
+                      <span>
+                        {k === "boundary"
+                          ? "Site boundary"
+                          : k[0].toUpperCase() + k.slice(1)}
+                      </span>
+                      <small>
+                        {project.objects.filter((o) => o.kind === k).length}
+                      </small>
+                      <button
+                        className="icon-button"
+                        aria-label={`Move ${k} layer up`}
+                        disabled={index === 0}
+                        onClick={() => {
+                          const next = [...layerOrder];
+                          [next[index - 1], next[index]] = [
+                            next[index],
+                            next[index - 1],
+                          ];
+                          setLayerOrder(next);
+                        }}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label={`Move ${k} layer down`}
+                        disabled={index === layerOrder.length - 1}
+                        onClick={() => {
+                          const next = [...layerOrder];
+                          [next[index], next[index + 1]] = [
+                            next[index + 1],
+                            next[index],
+                          ];
+                          setLayerOrder(next);
+                        }}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                    <label className="layer-opacity">
+                      Opacity{" "}
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={opacity[k]}
+                        onChange={(e) =>
+                          setOpacity({
+                            ...opacity,
+                            [k]: Number(e.target.value),
+                          })
+                        }
+                      />
+                      <span>{Math.round(opacity[k] * 100)}%</span>
+                    </label>
                   </div>
-                  <label className="layer-opacity">
-                    Opacity{" "}
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={opacity[k]}
-                      onChange={(e) =>
-                        setOpacity({ ...opacity, [k]: Number(e.target.value) })
-                      }
-                    />
-                    <span>{Math.round(opacity[k] * 100)}%</span>
-                  </label>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
           <div className="section-title">
             DESIGN OBJECTS <span>{project.objects.length}</span>
           </div>
@@ -640,6 +667,31 @@ export default function App() {
             </button>
           </div>
           <div className="zoom-controls" aria-label="Map zoom controls">
+            <button
+              aria-label="Fullscreen map"
+              title="Fullscreen map"
+              onClick={() => {
+                const target = document.querySelector("main");
+                if (document.fullscreenElement) document.exitFullscreen();
+                else target?.requestFullscreen?.();
+              }}
+            >
+              <Maximize size={18} />
+            </button>
+            <button
+              aria-label="Reset north"
+              title="Reset north"
+              onClick={() => setAction({ type: "top", seq: Date.now() })}
+            >
+              <Compass size={18} />
+            </button>
+            <button
+              aria-label="Toggle globe context"
+              title="Toggle globe context"
+              onClick={() => setContext("Cesium globe · OpenStreetMap imagery")}
+            >
+              <Globe2 size={18} />
+            </button>
             <button
               aria-label="Zoom in"
               title="Zoom in"

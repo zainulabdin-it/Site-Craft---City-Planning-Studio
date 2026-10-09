@@ -93,6 +93,20 @@ header {
   margin-left: 4px;
   color: #7d8d86;
 }
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.top-nav button {
+  border: 0;
+  background: transparent;
+  padding: 8px 9px;
+  font-size: 12px;
+  color: #2f403b;
+}
+.top-nav button:hover { background: #eef4f0; color: #126b55; }
 .project-title {
   flex: 1;
   font-size: 12px;
@@ -180,6 +194,20 @@ h2 {
 .section-title span {
   margin-left: auto;
   color: #8f9e96;
+}
+.section-title.collapsible {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  justify-content: flex-start;
+  color: inherit;
+}
+.section-title.collapsible:hover {
+  background: #f2f7f3;
+}
+.section-title.collapsible span {
+  margin-left: auto;
 }
 .layer {
   display: flex;
