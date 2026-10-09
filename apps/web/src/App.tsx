@@ -448,7 +448,7 @@ export default function App() {
                   <Search size={15} />
                   <input
                     aria-label="Search map location"
-                    placeholder="Search a city or address"
+                    placeholder="Search in New Zealand"
                     value={locationQuery}
                     onChange={(e) => setLocationQuery(e.target.value)}
                   />
@@ -472,7 +472,9 @@ export default function App() {
                         <span>{result.name}</span>
                       </button>
                     ))}
-                    <small>Search data © OpenStreetMap contributors</small>
+                    <small>
+                      New Zealand search · © OpenStreetMap contributors
+                    </small>
                   </div>
                 )}
               </form>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLocationResults } from "./geocoding";
+import { buildLocationSearchUrl, parseLocationResults } from "./geocoding";
 
 describe("location search results", () => {
   it("converts Nominatim coordinates and bounding boxes", () => {
@@ -38,5 +38,15 @@ describe("location search results", () => {
       ]),
     ).toEqual([]);
     expect(() => parseLocationResults({})).toThrow("invalid data");
+  });
+
+  it("restricts every search request to New Zealand", () => {
+    const url = buildLocationSearchUrl(
+      "Queen Street",
+      "https://nominatim.openstreetmap.org/search",
+    );
+    expect(url.searchParams.get("q")).toBe("Queen Street");
+    expect(url.searchParams.get("countrycodes")).toBe("nz");
+    expect(url.searchParams.get("limit")).toBe("5");
   });
 });

@@ -54,6 +54,15 @@ export function parseLocationResults(input: unknown): LocationResult[] {
   });
 }
 
+export function buildLocationSearchUrl(query: string, endpoint: string) {
+  const url = new URL(endpoint);
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("limit", "5");
+  url.searchParams.set("countrycodes", "nz");
+  return url;
+}
+
 export async function searchLocations(
   query: string,
 ): Promise<LocationResult[]> {
@@ -70,10 +79,7 @@ export async function searchLocations(
   const endpoint =
       import.meta.env.VITE_GEOCODER_URL ||
       "https://nominatim.openstreetmap.org/search",
-    url = new URL(endpoint);
-  url.searchParams.set("q", q);
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("limit", "5");
+    url = buildLocationSearchUrl(q, endpoint);
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(10000),
