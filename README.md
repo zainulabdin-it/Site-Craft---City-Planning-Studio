@@ -50,9 +50,10 @@ Alternatively install PostgreSQL 17 and its PostGIS extension locally, create th
 4. Place a building, change floors, floor height, footprint dimensions, roof, colour and rotation. Numeric edits commit on Enter or blur.
 5. Place tree/car/bench/bridge placeholders. Select Move, then select an object and click each new anchor position. Move stays active for repeated adjustments until you choose Select or another tool. For precision, open local coordinates in the inspector. Polygon/road vertices can be edited there; preserve road vertex count.
 6. Undo/redo covers the last 100 object commands in the current session. Save explicitly, then reload or use Open project. Creating/opening a project clears undo history.
-7. Export Project JSON for lossless parametric exchange. GeoJSON exports geographic footprints/centerlines/anchors and parameters; it is not a complete project backup. JSON import is limited to 5 MB and schema-validated.
+7. Export Project JSON for lossless parametric exchange. GeoJSON exports geographic footprints/centerlines/anchors and parameters; it is not a complete project backup. JSON import is limited to 5 MB and schema-validated. Existing schema-v1 project files migrate automatically to schema v2 when opened.
 8. Submit a New Zealand city or address in the map search to inspect another location. Results are restricted to New Zealand. Search moves only the camera; it does not relocate or remove project objects. Use **Return to project** to frame the saved boundary again.
 9. Use **Save to computer** for a portable project JSON file. Supported browsers show a native Save dialog; others download the file. Use **Open from computer** to restore that file later.
+10. Use **Open from computer** with a `.geojson` file to add WGS84 Point, LineString, Polygon, MultiPoint, MultiLineString or MultiPolygon data as a persistent project layer. Imported properties are preserved. Each imported layer has working visibility, opacity, colour and delete controls.
 
 Mouse: left drag pans, wheel or the compact +/− controls zoom, and middle drag or Ctrl+left drag orbits (Cesium controls). Escape cancels drawing. 2D/3D buttons use top-down/oblique camera views in the same Cesium renderer.
 

@@ -55,7 +55,7 @@ button.active {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  min-width: 1060px;
+  min-width: 760px;
 }
 header {
   height: 68px;
@@ -66,6 +66,9 @@ header {
   align-items: center;
   gap: 12px;
   padding: 0 24px;
+  position: relative;
+  z-index: 50;
+  overflow: visible;
 }
 .brand {
   font-family: Manrope, sans-serif;
@@ -129,7 +132,7 @@ header {
   gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 .header-map-actions .pill {
   height: 36px;
@@ -170,7 +173,7 @@ header {
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(300px, 28vw) minmax(600px, 1fr) 220px;
+  grid-template-columns: minmax(270px, 28vw) minmax(420px, 1fr) 220px;
   min-height: 0;
   position: relative;
 }
@@ -453,6 +456,20 @@ h2 {
   margin-left: auto;
   color: #8fa095;
 }
+.layer-color {
+  width: 22px;
+  height: 22px;
+  padding: 1px;
+  border: 1px solid #cbdcfb;
+  border-radius: 4px;
+  background: #fff;
+}
+.imported-layer .layer > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .object-list {
   min-height: 60px;
   max-height: 220px;
@@ -578,6 +595,9 @@ main {
   border: 1px solid #dce4dd;
   border-radius: 7px;
   box-shadow: 0 8px 30px #1734292b;
+  z-index: 100;
+  max-height: min(320px, calc(100vh - 90px));
+  overflow-y: auto;
 }
 .location-results button {
   width: 100%;
@@ -631,7 +651,7 @@ main {
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 0;
+  bottom: 32px;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -642,6 +662,9 @@ main {
   box-shadow: 0 4px 24px #17342926;
   max-height: none;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #b8c5bd transparent;
   z-index: 4;
 }
 .tools-tab {
@@ -667,6 +690,7 @@ main {
   height: 40px;
   padding: 8px;
   border-radius: 6px;
+  flex: 0 0 40px;
 }
 .toolbar button.active {
   background: #e8f0ff;
@@ -942,5 +966,69 @@ footer {
   }
   .object-list {
     max-height: 170px;
+  }
+  .toolbar {
+    padding-block: 6px;
+    gap: 0;
+  }
+  .toolbar button {
+    height: 32px;
+    flex-basis: 32px;
+    padding: 5px 8px;
+  }
+  .toolbar i {
+    margin-block: 2px;
+  }
+}
+@media (max-height: 680px) {
+  .toolbar button {
+    height: 28px;
+    flex-basis: 28px;
+    padding-block: 3px;
+  }
+  .toolbar i {
+    margin-block: 1px;
+  }
+}
+@media (max-width: 1180px) {
+  header {
+    gap: 7px;
+    padding-inline: 14px;
+  }
+  .studio,
+  .project-title,
+  .header-map-actions .pill {
+    display: none;
+  }
+  .header-map-actions .location-search {
+    max-width: none;
+  }
+  .workspace {
+    grid-template-columns: minmax(250px, 30vw) minmax(360px, 1fr) 200px;
+  }
+  .workspace.right-collapsed {
+    grid-template-columns: minmax(250px, 30vw) minmax(360px, 1fr) 0;
+  }
+}
+@media (max-width: 900px) {
+  .top-nav button {
+    font-size: 0;
+    gap: 0;
+  }
+  .top-nav button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .header-map-actions .return-project,
+  .save-state,
+  .engine-picker {
+    display: none;
+  }
+  .workspace,
+  .workspace.right-collapsed {
+    grid-template-columns: minmax(230px, 34vw) minmax(0, 1fr) 0;
+  }
+  .right {
+    display: none;
   }
 }

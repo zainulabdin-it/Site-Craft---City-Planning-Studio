@@ -1,5 +1,5 @@
 """Versioned parametric project representation; meshes are never authoritative."""
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 from math import isfinite, hypot, cos, sin, radians
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -45,9 +45,36 @@ class DesignObject(BaseModel):
             raise ValueError('Object requires one anchor')
         return self
 
+class DataGeometry(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    type: Literal['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon']
+    coordinates: Any
+
+class DataFeature(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    id: UUID
+    geometry: DataGeometry
+    properties: dict[str, Any]
+
+class DataLayer(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    id: UUID
+    name: str = Field(min_length=1, max_length=100)
+    visible: bool
+    opacity: float = Field(ge=0, le=1)
+    color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
+    source: str = Field(max_length=200)
+    features: list[DataFeature] = Field(max_length=50000)
+
+class DesignLayer(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    kind: Literal['boundary', 'road', 'building', 'plot', 'tree', 'car', 'bench', 'bridge']
+    visible: bool
+    opacity: float = Field(ge=0, le=1)
+
 class Project(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
-    schemaVersion: Literal[1]
+    schemaVersion: Literal[1, 2]
     id: UUID
     name: str = Field(min_length=1, max_length=100)
     revision: int = Field(ge=0)
@@ -57,6 +84,8 @@ class Project(BaseModel):
     horizontalCRS: Literal['EPSG:2193']
     verticalReference: Literal['Conceptual offset above ellipsoid; not NZVD2016']
     objects: list[DesignObject] = Field(max_length=2000)
+    dataLayers: list[DataLayer] = Field(default_factory=list, max_length=100)
+    designLayers: list[DesignLayer] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode='after')
     def validate_design(self):

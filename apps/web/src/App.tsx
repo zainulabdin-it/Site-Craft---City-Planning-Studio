@@ -29,6 +29,9 @@ import {
   Globe2,
   PanelLeftClose,
   PanelRightClose,
+  Circle,
+  Square,
+  Pencil,
 } from "lucide-react";
 import {
   newProject,
@@ -39,6 +42,7 @@ import {
   type Kind,
   type Point,
   type DesignObject,
+  type DataLayer,
 } from "./model";
 import {
   validateProject,
@@ -59,6 +63,7 @@ import {
 } from "./persistence";
 import { Viewport, type ViewAction } from "./Viewport";
 import { searchLocations, type LocationResult } from "./geocoding";
+import { importGeoJSON } from "./geojson";
 function initial() {
   try {
     const all = listLocal();
@@ -93,15 +98,23 @@ export default function App() {
   const [boot] = useState(initial);
   const [project, setProject] = useState<Project>(boot.project),
     [selected, setSelected] = useState(""),
-    [tool, setTool] = useState<Kind | "select" | "move">("select"),
+    [tool, setTool] = useState<
+      Kind | "select" | "move" | "rectangle" | "circle" | "freehand"
+    >("select"),
     [draft, setDraft] = useState<Point[]>([]),
     [visible, setVisible] = useState(
-      Object.fromEntries(kinds.map((k) => [k, true])) as Record<Kind, boolean>,
+      Object.fromEntries(
+        boot.project.designLayers.map((layer) => [layer.kind, layer.visible]),
+      ) as Record<Kind, boolean>,
     ),
     [opacity, setOpacity] = useState<Record<Kind, number>>(
-      Object.fromEntries(kinds.map((k) => [k, 1])) as Record<Kind, number>,
+      Object.fromEntries(
+        boot.project.designLayers.map((layer) => [layer.kind, layer.opacity]),
+      ) as Record<Kind, number>,
     ),
-    [layerOrder, setLayerOrder] = useState<Kind[]>([...kinds]),
+    [layerOrder, setLayerOrder] = useState<Kind[]>(
+      boot.project.designLayers.map((layer) => layer.kind),
+    ),
     [engine, setEngine] = useState("Cesium 3D"),
     [layersOpen, setLayersOpen] = useState(true),
     [leftOpen, setLeftOpen] = useState(true),
@@ -145,6 +158,22 @@ export default function App() {
   };
   const frame = (id?: string, type: ViewAction["type"] = "frame") =>
     setAction({ id, type, seq: Date.now() });
+  const persistDesignLayers = (
+    order: Kind[],
+    nextVisible = visible,
+    nextOpacity = opacity,
+  ) => {
+    setProject((p) => ({
+      ...p,
+      designLayers: order.map((kind) => ({
+        kind,
+        visible: nextVisible[kind],
+        opacity: nextOpacity[kind],
+      })),
+    }));
+    version.current++;
+    setStatus("Unsaved");
+  };
   const cancel = () => {
     setDraft([]);
     setTool("select");
@@ -182,8 +211,10 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   });
   const finish = () => {
-    if (!["boundary", "road", "plot"].includes(tool)) return;
-    let o = newObject(project, tool as Kind, draft);
+    if (!["boundary", "road", "plot", "freehand"].includes(tool)) return;
+    const objectKind = tool === "freehand" ? "plot" : tool;
+    let o = newObject(project, objectKind as Kind, draft);
+    if (tool === "freehand") o.name = "Free style shape";
     const existing = project.objects.find((x) => x.kind === "boundary");
     if (tool === "boundary" && existing)
       o = { ...o, id: existing.id, name: existing.name };
@@ -225,12 +256,37 @@ export default function App() {
       setError("Draw a project boundary first.");
       return;
     }
-    if (["boundary", "road", "plot"].includes(tool)) {
+    if (tool === "rectangle" || tool === "circle") {
+      if (!draft.length) {
+        setDraft([p]);
+        return;
+      }
+      const start = draft[0];
+      const points: Point[] =
+        tool === "rectangle"
+          ? [start, [p[0], start[1]], p, [start[0], p[1]]]
+          : Array.from({ length: 36 }, (_, i) => {
+              const angle = (i / 36) * Math.PI * 2,
+                radius = distance(start, p);
+              return [
+                start[0] + Math.cos(angle) * radius,
+                start[1] + Math.sin(angle) * radius,
+              ] as Point;
+            });
+      const shape = newObject(project, "plot", points);
+      shape.name = tool === "rectangle" ? "Rectangle" : "Circle";
+      if (edit([shape], [], `Draw ${tool}`)) {
+        setSelected(shape.id);
+        setDraft([]);
+      }
+      return;
+    }
+    if (["boundary", "road", "plot", "freehand"].includes(tool)) {
       if (draft.length && distance(draft.at(-1)!, p) < 0.1) return;
       setDraft([...draft, p]);
       return;
     }
-    const o = newObject(project, tool, [p]);
+    const o = newObject(project, tool as Kind, [p]);
     if (edit([o], [], `Place ${tool}`)) setSelected(o.id);
   };
   const updateConnected = (o: DesignObject) => {
@@ -281,7 +337,17 @@ export default function App() {
     }
   };
   const switchProject = (p: Project) => {
-    setProject(validateProject(p));
+    const validated = validateProject(p);
+    setProject(validated);
+    const nextVisible = Object.fromEntries(
+        validated.designLayers.map((layer) => [layer.kind, layer.visible]),
+      ) as Record<Kind, boolean>,
+      nextOpacity = Object.fromEntries(
+        validated.designLayers.map((layer) => [layer.kind, layer.opacity]),
+      ) as Record<Kind, number>;
+    setVisible(nextVisible);
+    setOpacity(nextOpacity);
+    setLayerOrder(validated.designLayers.map((layer) => layer.kind));
     version.current++;
     setSelected("");
     setUndo([]);
@@ -290,6 +356,16 @@ export default function App() {
     setStatus("Unsaved");
     setDialog(null);
     frame();
+  };
+  const updateDataLayer = (id: string, changes: Partial<DataLayer>) => {
+    setProject((p) => ({
+      ...p,
+      dataLayers: p.dataLayers.map((layer) =>
+        layer.id === id ? { ...layer, ...changes } : layer,
+      ),
+    }));
+    version.current++;
+    setStatus("Unsaved");
   };
   const open = async () => {
     try {
@@ -321,6 +397,30 @@ export default function App() {
       location: { center: result.center, bounds: result.bounds },
       seq: Date.now(),
     });
+  };
+  const openComputerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      if (f.size > 5_000_000) throw Error("Project file exceeds 5 MB.");
+      const parsed = JSON.parse(await f.text());
+      if (
+        f.name.toLowerCase().endsWith(".geojson") ||
+        parsed?.type === "FeatureCollection" ||
+        parsed?.type === "Feature"
+      ) {
+        const layer = importGeoJSON(parsed, f.name);
+        setProject((p) => ({ ...p, dataLayers: [...p.dataLayers, layer] }));
+        version.current++;
+        setStatus("Unsaved");
+        setLeftOpen(true);
+        setLayersOpen(true);
+        setError("");
+      } else switchProject(validateProject(parsed));
+    } catch (err) {
+      setError(String(err));
+    }
+    e.target.value = "";
   };
   return (
     <div className="app">
@@ -369,6 +469,23 @@ export default function App() {
             >
               {searching ? "…" : "Search"}
             </button>
+            {locationResults.length > 0 && (
+              <div className="location-results" role="listbox">
+                {locationResults.map((result) => (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    key={result.id}
+                    onClick={() => goToLocation(result)}
+                  >
+                    <MapPin size={14} />
+                    <span>{result.name}</span>
+                  </button>
+                ))}
+                <small>New Zealand search · © OpenStreetMap contributors</small>
+              </div>
+            )}
           </form>
           <button
             className="return-project"
@@ -430,6 +547,9 @@ export default function App() {
                 New
               </button>
               <button onClick={open}>Open project</button>
+              <button onClick={() => switchProject(demoProject())}>
+                Open demo
+              </button>
             </div>
             <label className="field">
               Save destination
@@ -450,11 +570,18 @@ export default function App() {
             >
               <Layers size={15} /> Layers{" "}
               <span>
-                {project.objects.length} {layersOpen ? "⌃" : "⌄"}
+                {kinds.length + project.dataLayers.length}{" "}
+                {layersOpen ? "⌃" : "⌄"}
               </span>
             </button>
             {layersOpen && (
               <div className="layers">
+                <button
+                  className="wide import-layer"
+                  onClick={() => file.current?.click()}
+                >
+                  <Plus size={14} /> Import GeoJSON
+                </button>
                 {layerOrder.map((k, index) => {
                   const Icon = icons[k];
                   return (
@@ -464,9 +591,11 @@ export default function App() {
                           aria-label={`Show ${k} layer`}
                           type="checkbox"
                           checked={visible[k]}
-                          onChange={(e) =>
-                            setVisible({ ...visible, [k]: e.target.checked })
-                          }
+                          onChange={(e) => {
+                            const next = { ...visible, [k]: e.target.checked };
+                            setVisible(next);
+                            persistDesignLayers(layerOrder, next, opacity);
+                          }}
                         />
                         <Icon size={15} />
                         <span>
@@ -488,6 +617,7 @@ export default function App() {
                               next[index - 1],
                             ];
                             setLayerOrder(next);
+                            persistDesignLayers(next);
                           }}
                         >
                           ↑
@@ -503,6 +633,7 @@ export default function App() {
                               next[index],
                             ];
                             setLayerOrder(next);
+                            persistDesignLayers(next);
                           }}
                         >
                           ↓
@@ -519,18 +650,83 @@ export default function App() {
                           style={{
                             background: `linear-gradient(to right, #2563eb ${opacity[k] * 100}%, #dbeafe ${opacity[k] * 100}%)`,
                           }}
-                          onChange={(e) =>
-                            setOpacity({
+                          onChange={(e) => {
+                            const next = {
                               ...opacity,
                               [k]: Number(e.target.value),
-                            })
-                          }
+                            };
+                            setOpacity(next);
+                            persistDesignLayers(layerOrder, visible, next);
+                          }}
                         />
                         <span>{Math.round(opacity[k] * 100)}%</span>
                       </label>
                     </div>
                   );
                 })}
+                {project.dataLayers.map((layer) => (
+                  <div key={layer.id} className="layer-card imported-layer">
+                    <div className="layer">
+                      <input
+                        aria-label={`Show ${layer.name} layer`}
+                        type="checkbox"
+                        checked={layer.visible}
+                        onChange={(e) =>
+                          updateDataLayer(layer.id, {
+                            visible: e.target.checked,
+                          })
+                        }
+                      />
+                      <Layers size={15} />
+                      <span title={layer.name}>{layer.name}</span>
+                      <small>{layer.features.length}</small>
+                      <input
+                        aria-label={`${layer.name} color`}
+                        className="layer-color"
+                        type="color"
+                        value={layer.color}
+                        onChange={(e) =>
+                          updateDataLayer(layer.id, { color: e.target.value })
+                        }
+                      />
+                      <button
+                        className="icon-button"
+                        aria-label={`Delete ${layer.name} layer`}
+                        onClick={() => {
+                          setProject((p) => ({
+                            ...p,
+                            dataLayers: p.dataLayers.filter(
+                              (x) => x.id !== layer.id,
+                            ),
+                          }));
+                          version.current++;
+                          setStatus("Unsaved");
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <label className="layer-opacity">
+                      Opacity
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={layer.opacity}
+                        style={{
+                          background: `linear-gradient(to right, #2563eb ${layer.opacity * 100}%, #dbeafe ${layer.opacity * 100}%)`,
+                        }}
+                        onChange={(e) =>
+                          updateDataLayer(layer.id, {
+                            opacity: Number(e.target.value),
+                          })
+                        }
+                      />
+                      <span>{Math.round(layer.opacity * 100)}%</span>
+                    </label>
+                  </div>
+                ))}
               </div>
             )}
             <div className="section-title">
@@ -673,6 +869,9 @@ export default function App() {
                   ["road", Route, "Road"],
                   ["building", Building2, "Building"],
                   ["plot", Pentagon, "Plot"],
+                  ["rectangle", Square, "Rectangle"],
+                  ["circle", Circle, "Circle"],
+                  ["freehand", Pencil, "Free style"],
                   ["move", Move, "Move"],
                 ] as const
               ).map(([t, Icon, label]) => (
@@ -807,9 +1006,9 @@ export default function App() {
                   ? current
                     ? `Click a new position for ${current.name}, or drag it`
                     : "Click an object to move, then click its new position"
-                  : `Click the map to ${["road", "boundary", "plot"].includes(tool) ? "draw" : "place"} ${tool}`}
+                  : `Click the map to ${["road", "boundary", "plot", "rectangle", "circle", "freehand"].includes(tool) ? "draw" : "place"} ${tool}`}
               </b>
-              {["road", "boundary", "plot"].includes(tool) && (
+              {["road", "boundary", "plot", "freehand"].includes(tool) && (
                 <>
                   <span>
                     {draft.length} points ·{" "}
@@ -943,25 +1142,6 @@ export default function App() {
               <button onClick={() => file.current?.click()}>
                 <FolderOpen size={14} /> Open from computer
               </button>
-              <input
-                hidden
-                ref={file}
-                type="file"
-                accept=".json,application/json"
-                onChange={async (e) => {
-                  try {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    if (f.size > 5_000_000)
-                      throw Error("Project file exceeds 5 MB.");
-                    const p = validateProject(JSON.parse(await f.text()));
-                    switchProject(p);
-                  } catch (err) {
-                    setError(String(err));
-                  }
-                  e.target.value = "";
-                }}
-              />
             </div>
           </aside>
         ) : (
@@ -975,6 +1155,13 @@ export default function App() {
           </button>
         )}
       </div>
+      <input
+        hidden
+        ref={file}
+        type="file"
+        accept=".json,.geojson,application/json,application/geo+json"
+        onChange={openComputerFile}
+      />
       <footer>
         <span>
           <span className="live-dot" /> LOCAL PLANNING WORKSPACE
@@ -1202,8 +1389,51 @@ function Properties({
       )}
       {!["boundary", "plot", "road"].includes(o.kind) &&
         number("rotation", "Rotation (°)", -360, 360)}
-      {["tree", "car", "bench", "bridge"].includes(o.kind) &&
-        number("scale", "Asset scale", 0.2, 5, 0.1)}
+      {["tree", "car", "bench", "bridge"].includes(o.kind) && (
+        <>
+          <label className="field">
+            Shape
+            <select
+              value={
+                o.assetRef.endsWith(":v1")
+                  ? `builtin:${o.kind}:${o.kind === "tree" ? "native" : o.kind === "car" ? "sedan" : o.kind === "bench" ? "timber" : "beam"}`
+                  : o.assetRef
+              }
+              onChange={(e) => onUpdate({ ...o, assetRef: e.target.value })}
+            >
+              {(o.kind === "tree"
+                ? [
+                    ["builtin:tree:native", "Native canopy"],
+                    ["builtin:tree:palm", "Palm"],
+                    ["builtin:tree:columnar", "Columnar"],
+                  ]
+                : o.kind === "car"
+                  ? [
+                      ["builtin:car:sedan", "Sedan"],
+                      ["builtin:car:suv", "SUV"],
+                      ["builtin:car:van", "Van"],
+                    ]
+                  : o.kind === "bench"
+                    ? [
+                        ["builtin:bench:timber", "Timber bench"],
+                        ["builtin:bench:modern", "Modern bench"],
+                        ["builtin:bench:stone", "Stone bench"],
+                      ]
+                    : [
+                        ["builtin:bridge:beam", "Beam bridge"],
+                        ["builtin:bridge:arch", "Arch bridge"],
+                        ["builtin:bridge:pedestrian", "Pedestrian bridge"],
+                      ]
+              ).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {number("scale", "Asset scale", 0.2, 5, 0.1)}
+        </>
+      )}
       {o.kind === "bridge" && (
         <p className="muted small">
           Fixed concept deck, 10 × 30 m, 5 m ellipsoid offset. No approaches,
