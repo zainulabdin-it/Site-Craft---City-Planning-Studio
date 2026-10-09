@@ -23,6 +23,7 @@ import {
   Search,
   RotateCcw,
   FolderOpen,
+  Minus,
 } from "lucide-react";
 import {
   newProject,
@@ -201,7 +202,6 @@ export default function App() {
         return;
       }
       updateConnected(moveTo(current, p));
-      setTool("select");
       return;
     }
     if (
@@ -537,6 +537,22 @@ export default function App() {
               onClick={() => history(false)}
             >
               <Redo2 size={19} />
+            </button>
+          </div>
+          <div className="zoom-controls" aria-label="Map zoom controls">
+            <button
+              aria-label="Zoom in"
+              title="Zoom in"
+              onClick={() => setAction({ type: "zoom-in", seq: Date.now() })}
+            >
+              <Plus size={16} />
+            </button>
+            <button
+              aria-label="Zoom out"
+              title="Zoom out"
+              onClick={() => setAction({ type: "zoom-out", seq: Date.now() })}
+            >
+              <Minus size={16} />
             </button>
           </div>
           {tool !== "select" && (

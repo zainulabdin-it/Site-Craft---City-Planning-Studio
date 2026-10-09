@@ -9,7 +9,7 @@ import {
 } from "./model";
 import { toGeo, toLocal, footprint } from "./geometry";
 export type ViewAction = {
-  type: "frame" | "top" | "perspective" | "location";
+  type: "frame" | "top" | "perspective" | "location" | "zoom-in" | "zoom-out";
   id?: string;
   location?: {
     center: Point;
@@ -391,6 +391,14 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    if (props.action.type === "zoom-in" || props.action.type === "zoom-out") {
+      const height = v.camera.positionCartographic.height,
+        amount = Math.max(2, height * 0.35);
+      if (props.action.type === "zoom-in") v.camera.zoomIn(amount);
+      else v.camera.zoomOut(amount);
+      v.scene.requestRender();
+      return;
+    }
     if (props.action.type === "location" && props.action.location) {
       const { center, bounds } = props.action.location,
         width = Math.max(bounds[2] - bounds[0], 0.01),

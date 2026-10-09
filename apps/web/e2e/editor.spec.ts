@@ -70,6 +70,11 @@ test("real Cesium editor: draw, connect, edit, persist, reload and export", asyn
   await page.getByLabel("Rotation (°)").press("Enter");
   await page.getByRole("button", { name: "Move", exact: true }).click();
   await click(0.63, 0.66);
+  await expect(
+    page.getByRole("button", { name: "Move", exact: true }),
+  ).toHaveClass(/active/);
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
   await page.getByRole("button", { name: "Save project", exact: true }).click();
   await expect(page.locator(".save-state")).toContainText("Saved");
   const before = await page.evaluate(() =>
