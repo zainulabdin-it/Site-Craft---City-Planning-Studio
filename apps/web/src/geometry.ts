@@ -33,6 +33,16 @@ export const area = (p: Point[]) =>
       return s + a[0] * b[1] - b[0] * a[1];
     }, 0) / 2,
   );
+export function moveTo(o: DesignObject, anchor: Point): DesignObject {
+  const [x, y] = o.points[0],
+    delta: Point = [anchor[0] - x, anchor[1] - y];
+  return {
+    ...o,
+    points: o.points.map(
+      ([east, north]) => [east + delta[0], north + delta[1]] as Point,
+    ),
+  };
+}
 const cross = (a: Point, b: Point, c: Point) =>
   (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
 function intersects(a: Point, b: Point, c: Point, d: Point) {

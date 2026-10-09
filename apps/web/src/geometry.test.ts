@@ -9,6 +9,7 @@ import {
   roadSurface,
   validateProject,
   footprint,
+  moveTo,
 } from "./geometry";
 import { applyCommand, command } from "./history";
 describe("metric geometry and project commands", () => {
@@ -104,6 +105,21 @@ describe("metric geometry and project commands", () => {
         elevation: 5,
       };
     expect(connectRoad(b, [a])).toHaveLength(1);
+  });
+  it("moves an object by its anchor while preserving its shape", () => {
+    const p = newProject(),
+      plot = newObject(p, "plot", [
+        [10, 20],
+        [30, 20],
+        [30, 40],
+        [10, 40],
+      ]);
+    expect(moveTo(plot, [100, 200]).points).toEqual([
+      [100, 200],
+      [120, 200],
+      [120, 220],
+      [100, 220],
+    ]);
   });
   it("validates dimensions, scene persistence, and parametric footprint changes", () => {
     const p = demoProject();

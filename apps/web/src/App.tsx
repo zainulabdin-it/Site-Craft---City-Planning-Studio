@@ -37,6 +37,7 @@ import {
   length,
   area,
   distance,
+  moveTo,
 } from "./geometry";
 import { command, applyCommand, type Command } from "./history";
 import {
@@ -167,6 +168,7 @@ export default function App() {
     if (edit(updates, [], `Draw ${tool}`)) {
       setSelected(o.id);
       cancel();
+      if (tool === "boundary") frame(o.id, "top");
     }
   };
   const click = (p: Point, id?: string) => {
@@ -176,20 +178,21 @@ export default function App() {
     }
     if (tool === "move") {
       if (!current) {
-        setError("Select an object before moving it.");
+        const target = project.objects.find((o) => o.id === id);
+        if (target && target.kind !== "boundary") {
+          setSelected(target.id);
+          setError("");
+          return;
+        }
+        setError("Click an object, then click its new position.");
         return;
       }
-      const delta: Point = [
-        p[0] - current.points[0][0],
-        p[1] - current.points[0][1],
-      ];
-      const moved = {
-        ...current,
-        points: current.points.map(
-          (q) => [q[0] + delta[0], q[1] + delta[1]] as Point,
-        ),
-      };
-      updateConnected(moved);
+      if (current.kind === "boundary") {
+        setError("Edit the boundary vertices in the inspector.");
+        setTool("select");
+        return;
+      }
+      updateConnected(moveTo(current, p));
       setTool("select");
       return;
     }
@@ -226,6 +229,12 @@ export default function App() {
         if (changed) updates.push({ ...r, points });
       }
     return edit(updates);
+  };
+  const moveObject = (id: string, anchor: Point) => {
+    const object = project.objects.find((o) => o.id === id);
+    if (!object || object.kind === "boundary") return;
+    setSelected(id);
+    updateConnected(moveTo(object, anchor));
   };
   const save = async () => {
     const captured = version.current;
@@ -392,6 +401,7 @@ export default function App() {
             visible={visible}
             draft={draft}
             onClick={click}
+            onMove={moveObject}
             onError={setError}
             onContext={setContext}
             action={action}
@@ -425,6 +435,10 @@ export default function App() {
                 title={label}
                 aria-label={label}
                 onClick={() => {
+                  if (t === "move" && current?.kind === "boundary") {
+                    setError("Edit the boundary vertices in the inspector.");
+                    return;
+                  }
                   setTool(t);
                   setDraft([]);
                 }}
@@ -455,7 +469,9 @@ export default function App() {
             <div className="drawing-hint">
               <b>
                 {tool === "move"
-                  ? "Click a new anchor position"
+                  ? current
+                    ? `Click a new position for ${current.name}, or drag it`
+                    : "Click an object to move, then click its new position"
                   : `Click the map to ${["road", "boundary", "plot"].includes(tool) ? "draw" : "place"} ${tool}`}
               </b>
               {["road", "boundary", "plot"].includes(tool) && (
@@ -501,6 +517,10 @@ export default function App() {
               object={current}
               onUpdate={updateConnected}
               onFrame={() => frame(current.id)}
+              onMove={() => {
+                setTool("move");
+                setDraft([]);
+              }}
               onDelete={() => {
                 if (edit([], [current.id], "Delete object")) setSelected("");
               }}
@@ -651,12 +671,14 @@ function Properties({
   object: o,
   onUpdate,
   onFrame,
+  onMove,
   onDelete,
   onDuplicate,
 }: {
   object: DesignObject;
   onUpdate: (o: DesignObject) => boolean;
   onFrame: () => void;
+  onMove: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
 }) {
@@ -725,6 +747,11 @@ function Properties({
         <button aria-label="Duplicate selected" onClick={onDuplicate}>
           <Copy size={15} />
         </button>
+        {o.kind !== "boundary" && (
+          <button aria-label="Move selected on canvas" onClick={onMove}>
+            <Move size={15} />
+          </button>
+        )}
         <button aria-label="Delete selected" onClick={onDelete}>
           <Trash2 size={15} />
         </button>

@@ -19,6 +19,7 @@ interface Props {
   selected: string;
   draft: Point[];
   onClick: (p: Point, id?: string) => void;
+  onMove: (id: string, p: Point) => void;
   onError: (s: string) => void;
   action: ViewAction;
   onContext: (s: string) => void;
@@ -61,10 +62,14 @@ export function Viewport(props: Props) {
     v.scene.globe.depthTestAgainstTerrain = false;
     const provider = new C.OpenStreetMapImageryProvider({
       url: "https://tile.openstreetmap.org/",
+      maximumLevel: 19,
     });
+    // Background imagery is optional once the user is working on the opaque
+    // site canvas. A missing high-zoom tile should not interrupt editing with
+    // the same alert used for invalid design geometry.
     provider.errorEvent.addEventListener(() =>
-      latest.current.onError(
-        "Map tiles unavailable. Editing remains available; check your connection.",
+      latest.current.onContext(
+        "Some OpenStreetMap tiles unavailable · design canvas remains active",
       ),
     );
     v.imageryLayers.addImageryProvider(provider);
@@ -107,18 +112,47 @@ export function Viewport(props: Props) {
       orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
     });
     const h = new C.ScreenSpaceEventHandler(v.canvas);
-    h.setInputAction((e: { position: C.Cartesian2 }) => {
-      const ray = v.camera.getPickRay(e.position);
-      const hit = ray && v.scene.globe.pick(ray, v.scene);
+    const objectAt = (position: C.Cartesian2) => {
+      const ids = new Set(latest.current.project.objects.map((o) => o.id));
+      for (const hit of v.scene.drillPick(position)) {
+        const raw = hit?.id?.id;
+        if (typeof raw !== "string") continue;
+        const id = raw.replace(/:.*$/, "");
+        if (ids.has(id)) return id;
+      }
+    };
+    const groundAt = (position: C.Cartesian2) => {
+      const ray = v.camera.getPickRay(position),
+        hit = ray && v.scene.globe.pick(ray, v.scene);
       if (!hit) return;
-      const c = C.Cartographic.fromCartesian(hit),
-        p = toLocal(
-          [C.Math.toDegrees(c.longitude), C.Math.toDegrees(c.latitude)],
-          latest.current.project.origin,
-        );
-      const picked = v.scene.pick(e.position);
-      latest.current.onClick(p, picked?.id?.id?.replace(/:.*$/, ""));
+      const c = C.Cartographic.fromCartesian(hit);
+      return toLocal(
+        [C.Math.toDegrees(c.longitude), C.Math.toDegrees(c.latitude)],
+        latest.current.project.origin,
+      );
+    };
+    h.setInputAction((e: { position: C.Cartesian2 }) => {
+      const p = groundAt(e.position);
+      if (p) latest.current.onClick(p, objectAt(e.position));
     }, C.ScreenSpaceEventType.LEFT_CLICK);
+    let drag: { id: string; start: C.Cartesian2; end: C.Cartesian2 } | undefined;
+    h.setInputAction((e: { position: C.Cartesian2 }) => {
+      const id = objectAt(e.position),
+        object = latest.current.project.objects.find((o) => o.id === id);
+      if (!id || object?.kind === "boundary") return;
+      drag = { id, start: C.Cartesian2.clone(e.position), end: C.Cartesian2.clone(e.position) };
+    }, C.ScreenSpaceEventType.LEFT_DOWN);
+    h.setInputAction((e: { endPosition: C.Cartesian2 }) => {
+      if (drag) drag.end = C.Cartesian2.clone(e.endPosition);
+    }, C.ScreenSpaceEventType.MOUSE_MOVE);
+    h.setInputAction((e: { position: C.Cartesian2 }) => {
+      if (!drag) return;
+      const moved = C.Cartesian2.distance(drag.start, drag.end) > 4,
+        p = moved ? groundAt(e.position) : undefined,
+        id = drag.id;
+      drag = undefined;
+      if (p) latest.current.onMove(id, p);
+    }, C.ScreenSpaceEventType.LEFT_UP);
     v.screenSpaceEventHandler.removeInputAction(
       C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK,
     );
@@ -170,12 +204,12 @@ export function Viewport(props: Props) {
         if (o.kind === "boundary" || o.kind === "plot") {
           e.polygon = polygon(
             o.points,
-            0.15,
+            o.kind === "boundary" ? 0 : 0.15,
             0,
             (o.kind === "boundary"
-              ? C.Color.fromCssColorString("#339b83")
+              ? C.Color.fromCssColorString("#f7faf5")
               : color
-            ).withAlpha(0.12),
+            ).withAlpha(o.kind === "boundary" ? 0.96 : 0.12),
           );
           e.polyline = {
             positions: [...o.points, o.points[0]].map((q) => position(q, 0.3)),
