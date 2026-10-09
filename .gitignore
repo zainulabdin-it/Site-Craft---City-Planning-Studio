@@ -9,5 +9,6 @@ __pycache__/
 storage/
 test-results/
 playwright-report/
+.asset-work/
 apps/web/public/cesium/
 *.tsbuildinfo

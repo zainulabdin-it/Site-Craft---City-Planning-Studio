@@ -8,6 +8,7 @@ import {
   type Project,
   type DesignObject,
   projectSchema,
+  legacyProjectSchema,
 } from "./model";
 proj4.defs(
   "EPSG:2193",
@@ -100,7 +101,25 @@ export function footprint(o: DesignObject): Point[] {
   ]);
 }
 export function validateProject(input: unknown): Project {
-  const p = projectSchema.parse(input);
+  const version = (input as { schemaVersion?: unknown })?.schemaVersion;
+  const p =
+    version === 1
+      ? projectSchema.parse({
+          ...legacyProjectSchema.parse(input),
+          schemaVersion: 2,
+          dataLayers: [],
+          designLayers: [
+            "boundary",
+            "road",
+            "building",
+            "plot",
+            "tree",
+            "car",
+            "bench",
+            "bridge",
+          ].map((kind) => ({ kind, visible: true, opacity: 1 })),
+        })
+      : projectSchema.parse(input);
   const ids = new Set<string>(),
     nodes = new Map<string, string>();
   const bounds = p.objects.filter((o) => o.kind === "boundary");
@@ -238,6 +257,15 @@ export function roadSurface(roads: DesignObject[]): MultiPolygon {
   }
   // Quantize derived vertices to a micrometre. Trigonometric near-zero noise at
   // quadrant/cardinal points otherwise creates almost-coincident ring edges.
-  const stable = parts.map(polygon => polygon.map(ring => ring.map(([x,y]) => [Math.round(x*1e6)/1e6, Math.round(y*1e6)/1e6] as Point)));
-  return stable.length ? polygonClipping.union(stable[0], ...stable.slice(1)) : [];
+  const stable = parts.map((polygon) =>
+    polygon.map((ring) =>
+      ring.map(
+        ([x, y]) =>
+          [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6] as Point,
+      ),
+    ),
+  );
+  return stable.length
+    ? polygonClipping.union(stable[0], ...stable.slice(1))
+    : [];
 }

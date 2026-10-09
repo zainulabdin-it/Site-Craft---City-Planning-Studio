@@ -13,6 +13,21 @@ import {
 } from "./geometry";
 import { applyCommand, command } from "./history";
 describe("metric geometry and project commands", () => {
+  it("migrates schema v1 projects to v2 without changing design objects", () => {
+    const current = demoProject();
+    const legacy = {
+      ...current,
+      schemaVersion: 1,
+      dataLayers: undefined,
+      designLayers: undefined,
+    };
+    delete (legacy as { dataLayers?: unknown }).dataLayers;
+    delete (legacy as { designLayers?: unknown }).designLayers;
+    const migrated = validateProject(legacy);
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.objects).toEqual(current.objects);
+    expect(migrated.dataLayers).toEqual([]);
+  });
   it("rejects road surfaces that escape a concave boundary despite inside endpoints", () => {
     const p = newProject();
     p.objects = [
@@ -125,7 +140,9 @@ describe("metric geometry and project commands", () => {
     const p = demoProject();
     expect(validateProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
     const b = p.objects.find((o) => o.kind === "building")!;
-    expect(area(footprint({ ...b, width: 20 }))).toBeCloseTo(320);
+    expect(area(footprint({ ...b, width: 20 }))).toBeCloseTo(
+      20 * b.depth * b.scale * b.scale,
+    );
     expect(() =>
       validateProject({ ...p, objects: [{ ...b, width: -1 }] }),
     ).toThrow();

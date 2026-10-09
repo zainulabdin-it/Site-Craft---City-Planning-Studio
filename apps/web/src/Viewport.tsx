@@ -193,12 +193,33 @@ export function Viewport(props: Props) {
       material: color,
       outline: false,
     });
+    const removeParts = (id: string) => {
+      for (const part of [...v.entities.values])
+        if (typeof part.id === "string" && part.id.startsWith(`${id}:`))
+          v.entities.remove(part);
+    };
+    const model = (
+      uri: string,
+      scale: number,
+      alpha: number,
+      selected: boolean,
+    ) => ({
+      uri,
+      scale,
+      color: C.Color.WHITE.withAlpha(alpha),
+      colorBlendMode: C.ColorBlendMode.HIGHLIGHT,
+      colorBlendAmount: 0,
+      silhouetteColor: selected
+        ? C.Color.fromCssColorString("#f8b84b")
+        : C.Color.TRANSPARENT,
+      silhouetteSize: selected ? 3 : 0,
+      shadows: C.ShadowMode.ENABLED,
+    });
     const alive = new Set(p.objects.map((o) => o.id));
     for (const id of cache.current.keys())
       if (!alive.has(id)) {
         v.entities.removeById(id);
-        for (let face = 0; face < 4; face++)
-          v.entities.removeById(`${id}:roof${face}`);
+        removeParts(id);
         cache.current.delete(id);
       }
     for (const o of p.objects) {
@@ -208,10 +229,10 @@ export function Viewport(props: Props) {
         opacityCache.current.get(o.id) !== props.opacity[o.kind]
       ) {
         if (entity) v.entities.remove(entity);
-        for (let face = 0; face < 4; face++)
-          v.entities.removeById(`${o.id}:roof${face}`);
+        removeParts(o.id);
         const selected = o.id === props.selected;
         const color = C.Color.fromCssColorString(o.color);
+        const variant = o.assetRef.split(":").at(-1) || "v1";
         const e: { id: string; [k: string]: unknown } = {
           id: o.id,
           name: o.name,
@@ -225,7 +246,7 @@ export function Viewport(props: Props) {
               ? C.Color.fromCssColorString("#f7faf5")
               : color
             ).withAlpha(
-              (o.kind === "boundary" ? 0.96 : 0.12) * props.opacity[o.kind],
+              (o.kind === "boundary" ? 0.86 : 0.42) * props.opacity[o.kind],
             ),
           );
           e.polyline = {
@@ -236,19 +257,88 @@ export function Viewport(props: Props) {
         } else if (o.kind === "road") {
           e.polyline = {
             positions: o.points.map((q) => position(q, o.elevation + 0.3)),
-            width: 3,
+            width: selected ? 5 : 2.5,
             material: selected
-              ? C.Color.YELLOW
-              : C.Color.WHITE.withAlpha(0.75 * props.opacity[o.kind]),
+              ? C.Color.fromCssColorString("#f8b84b")
+              : new C.PolylineDashMaterialProperty({
+                  color: C.Color.fromCssColorString("#f3c94b").withAlpha(
+                    props.opacity[o.kind],
+                  ),
+                  dashLength: 18,
+                }),
           };
         } else if (o.kind === "building") {
-          e.polygon = polygon(
-            footprint(o),
-            o.elevation + 0.2,
-            o.floors * o.floorHeight,
-            color.withAlpha(props.opacity[o.kind]),
+          const useHouseModel =
+            o.buildingType === "Detached house" ||
+            o.buildingType === "Townhouse";
+          const houseUri =
+            o.buildingType === "Townhouse"
+              ? "/assets/kenney/suburban/building-type-t.glb"
+              : variant === "k"
+                ? "/assets/kenney/suburban/building-type-k.glb"
+                : o.roof === "pitched"
+                  ? "/assets/kenney/suburban/building-type-f.glb"
+                  : "/assets/kenney/suburban/building-type-a.glb";
+          const houseScale = Math.min(o.width, o.depth) * o.scale * 0.62;
+          if (useHouseModel) {
+            e.position = position(o.points[0], o.elevation + houseScale);
+            e.orientation = C.Transforms.headingPitchRollQuaternion(
+              position(o.points[0]),
+              new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
+            );
+            e.model = model(
+              houseUri,
+              houseScale,
+              props.opacity[o.kind],
+              selected,
+            );
+          } else {
+            e.polygon = polygon(
+              footprint(o),
+              o.elevation + 0.2,
+              o.floors * o.floorHeight,
+              color.withAlpha(props.opacity[o.kind]),
+            );
+            v.entities.add({
+              id: `${o.id}:roof-cap`,
+              polygon: polygon(
+                footprint(o),
+                o.elevation + o.floors * o.floorHeight + 0.15,
+                0.35,
+                C.Color.fromCssColorString("#5b6470").withAlpha(
+                  props.opacity[o.kind],
+                ),
+              ),
+            });
+          }
+          const buildingOrientation = C.Transforms.headingPitchRollQuaternion(
+            position(o.points[0]),
+            new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
           );
-          if (o.roof === "pitched") {
+          for (
+            let floor = 0;
+            !useHouseModel && floor < Math.min(o.floors, 12);
+            floor++
+          )
+            v.entities.add({
+              id: `${o.id}:windows-${floor}`,
+              position: position(
+                o.points[0],
+                o.elevation + floor * o.floorHeight + o.floorHeight * 0.62,
+              ),
+              orientation: buildingOrientation,
+              box: {
+                dimensions: new C.Cartesian3(
+                  o.width * o.scale + 0.08,
+                  o.depth * o.scale + 0.08,
+                  Math.min(0.55, o.floorHeight * 0.2),
+                ),
+                material: C.Color.fromCssColorString("#84b9d6").withAlpha(
+                  props.opacity[o.kind] * 0.78,
+                ),
+              },
+            });
+          if (!useHouseModel && o.roof === "pitched") {
             const ring = footprint(o),
               center = position(
                 o.points[0],
@@ -287,46 +377,211 @@ export function Viewport(props: Props) {
             position(o.points[0]),
             new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
           );
-          if (o.kind === "tree")
-            e.ellipsoid = {
-              radii: new C.Cartesian3(3 * scale, 3 * scale, 5 * scale),
-              material: C.Color.fromCssColorString("#36775a"),
-            };
-          else
-            e.box = {
-              dimensions: new C.Cartesian3(
-                (o.kind === "bridge" ? o.width : o.kind === "car" ? 2 : 2) *
-                  scale,
-                (o.kind === "bridge" ? o.depth : o.kind === "car" ? 4.5 : 0.7) *
-                  scale,
-                (o.kind === "bridge" ? 0.8 : o.kind === "car" ? 1.5 : 1) *
-                  scale,
-              ),
-              material:
-                o.kind === "car"
-                  ? C.Color.fromCssColorString("#d99152").withAlpha(
-                      props.opacity[o.kind],
-                    )
-                  : C.Color.fromCssColorString("#8d9ca0").withAlpha(
+          if (o.kind === "tree") {
+            const palm = variant === "palm",
+              columnar = variant === "columnar";
+            if (!palm && !columnar) {
+              const treeScale = 4.8 * scale;
+              e.position = position(o.points[0], z + treeScale);
+              e.model = model(
+                variant === "small"
+                  ? "/assets/kenney/suburban/tree-small.glb"
+                  : "/assets/kenney/suburban/tree-large.glb",
+                treeScale,
+                props.opacity[o.kind],
+                selected,
+              );
+            } else {
+              e.ellipsoid = {
+                radii: new C.Cartesian3(
+                  (palm ? 2.8 : 1.8) * scale,
+                  (palm ? 2.8 : 1.8) * scale,
+                  (palm ? 1.5 : 5.2) * scale,
+                ),
+                material: C.Color.fromCssColorString("#2f7d4f").withAlpha(
+                  props.opacity[o.kind],
+                ),
+              };
+              v.entities.add({
+                id: `${o.id}:trunk`,
+                position: position(o.points[0], z + (palm ? 4 : 2.1) * scale),
+                cylinder: {
+                  length: (palm ? 8 : 4.2) * scale,
+                  topRadius: (palm ? 0.22 : 0.32) * scale,
+                  bottomRadius: (palm ? 0.42 : 0.48) * scale,
+                  material: C.Color.fromCssColorString("#79563d").withAlpha(
+                    props.opacity[o.kind],
+                  ),
+                },
+              });
+            }
+          } else {
+            if (o.kind === "car") {
+              const carUri =
+                variant === "van"
+                  ? "/assets/kenney/cars/van.glb"
+                  : variant === "suv"
+                    ? "/assets/kenney/cars/suv.glb"
+                    : "/assets/kenney/cars/sedan.glb";
+              const carScale = 2.25 * scale;
+              e.position = position(o.points[0], z + carScale);
+              e.model = model(
+                carUri,
+                carScale,
+                props.opacity[o.kind],
+                selected,
+              );
+            } else
+              e.box = {
+                dimensions: new C.Cartesian3(
+                  (o.kind === "bridge" ? o.width : 2) * scale,
+                  (o.kind === "bridge" ? o.depth : 0.7) * scale,
+                  (o.kind === "bridge" ? 0.8 : 0.18) * scale,
+                ),
+                material: C.Color.fromCssColorString(
+                  o.kind === "bench" && variant === "timber"
+                    ? "#8b5e3c"
+                    : "#8d9ca0",
+                ).withAlpha(props.opacity[o.kind]),
+              };
+            if (o.kind === "bench") {
+              for (const side of [-0.7, 0.7])
+                v.entities.add({
+                  id: `${o.id}:leg-${side}`,
+                  position: position(
+                    [
+                      o.points[0][0] +
+                        Math.cos((o.rotation * Math.PI) / 180) * side * scale,
+                      o.points[0][1] +
+                        Math.sin((o.rotation * Math.PI) / 180) * side * scale,
+                    ],
+                    z + 0.48 * scale,
+                  ),
+                  orientation: e.orientation as C.Quaternion,
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      0.16 * scale,
+                      0.58 * scale,
+                      0.85 * scale,
+                    ),
+                    material: C.Color.fromCssColorString("#343a40").withAlpha(
                       props.opacity[o.kind],
                     ),
-            };
+                  },
+                });
+              v.entities.add({
+                id: `${o.id}:back`,
+                position: position(o.points[0], z + 1.35 * scale),
+                orientation: e.orientation as C.Quaternion,
+                box: {
+                  dimensions: new C.Cartesian3(
+                    (variant === "modern" ? 2.7 : 2.1) * scale,
+                    (variant === "stone" ? 0.4 : 0.22) * scale,
+                    (variant === "stone" ? 0.65 : 1) * scale,
+                  ),
+                  material: C.Color.fromCssColorString(
+                    variant === "stone"
+                      ? "#a8a29e"
+                      : variant === "modern"
+                        ? "#4b5563"
+                        : "#8b5e3c",
+                  ).withAlpha(props.opacity[o.kind]),
+                },
+              });
+            } else if (o.kind === "bridge") {
+              const angle = (o.rotation * Math.PI) / 180;
+              const localPoint = (across: number, along: number): Point => [
+                o.points[0][0] +
+                  Math.cos(angle) * across -
+                  Math.sin(angle) * along,
+                o.points[0][1] +
+                  Math.sin(angle) * across +
+                  Math.cos(angle) * along,
+              ];
+              for (const side of [-1, 1])
+                v.entities.add({
+                  id: `${o.id}:rail-${side}`,
+                  position: position(
+                    localPoint((side * (o.width * scale - 0.4)) / 2, 0),
+                    z + 1.4 * scale,
+                  ),
+                  orientation: e.orientation as C.Quaternion,
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      (variant === "pedestrian" ? 0.12 : 0.18) * scale,
+                      o.depth * scale,
+                      1.2 * scale,
+                    ),
+                    material: C.Color.fromCssColorString("#6b7280").withAlpha(
+                      props.opacity[o.kind],
+                    ),
+                  },
+                });
+              for (const along of [-0.32, 0.32])
+                v.entities.add({
+                  id: `${o.id}:pier-${along}`,
+                  position: position(
+                    localPoint(0, along * o.depth * scale),
+                    Math.max(0.5, z / 2),
+                  ),
+                  orientation: e.orientation as C.Quaternion,
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      Math.max(2, o.width * scale - 1.5),
+                      0.7 * scale,
+                      Math.max(1, z + 0.8),
+                    ),
+                    material: C.Color.fromCssColorString("#70777b").withAlpha(
+                      props.opacity[o.kind],
+                    ),
+                  },
+                });
+              if (variant === "arch")
+                for (const side of [-1, 1])
+                  for (let step = -3; step <= 3; step++) {
+                    const along = (step / 7) * o.depth * scale;
+                    const archHeight =
+                      (1.2 + 2.2 * (1 - Math.pow(step / 3, 2))) * scale;
+                    v.entities.add({
+                      id: `${o.id}:arch-${side}-${step}`,
+                      position: position(
+                        localPoint((side * (o.width * scale - 0.4)) / 2, along),
+                        z + 0.8 * scale + archHeight / 2,
+                      ),
+                      orientation: e.orientation as C.Quaternion,
+                      box: {
+                        dimensions: new C.Cartesian3(
+                          0.22 * scale,
+                          0.35 * scale,
+                          archHeight,
+                        ),
+                        material: C.Color.fromCssColorString(
+                          "#4f5c63",
+                        ).withAlpha(props.opacity[o.kind]),
+                      },
+                    });
+                  }
+            }
+          }
         }
         entity = v.entities.add(e as C.Entity.ConstructorOptions);
         cache.current.set(o.id, o);
         opacityCache.current.set(o.id, props.opacity[o.kind]);
       }
       entity!.show = props.visible[o.kind];
-      for (let face = 0; face < 4; face++) {
-        const roof = v.entities.getById(`${o.id}:roof${face}`);
-        if (roof) roof.show = props.visible[o.kind];
-      }
+      for (const part of v.entities.values)
+        if (typeof part.id === "string" && part.id.startsWith(`${o.id}:`))
+          part.show = props.visible[o.kind];
       if (o.kind === "road" && entity?.polyline)
-        entity.polyline.material = new C.ColorMaterialProperty(
+        entity.polyline.material =
           o.id === props.selected
-            ? C.Color.YELLOW
-            : C.Color.WHITE.withAlpha(0.75 * props.opacity[o.kind]),
-        );
+            ? new C.ColorMaterialProperty(C.Color.fromCssColorString("#f8b84b"))
+            : new C.PolylineDashMaterialProperty({
+                color: C.Color.fromCssColorString("#f3c94b").withAlpha(
+                  props.opacity[o.kind],
+                ),
+                dashLength: 18,
+              });
     }
     // A single transient highlight avoids mutating stored design objects.
     v.entities.removeById("_selection");
@@ -370,6 +625,90 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    for (const entity of [...v.entities.values])
+      if (typeof entity.id === "string" && entity.id.startsWith("_data:"))
+        v.entities.remove(entity);
+    const point = (coordinate: unknown) => {
+      const xy = coordinate as number[];
+      return C.Cartesian3.fromDegrees(xy[0], xy[1], Number(xy[2] || 0) + 1);
+    };
+    for (const layer of props.project.dataLayers) {
+      if (!layer.visible) continue;
+      const color = C.Color.fromCssColorString(layer.color).withAlpha(
+        layer.opacity,
+      );
+      layer.features.forEach((feature, featureIndex) => {
+        const base = `_data:${layer.id}:${feature.id}:${featureIndex}`;
+        const addPoint = (coordinate: unknown, suffix = "") =>
+          v.entities.add({
+            id: `${base}${suffix}`,
+            position: point(coordinate),
+            point: {
+              pixelSize: 9,
+              color,
+              outlineColor: C.Color.WHITE.withAlpha(layer.opacity),
+              outlineWidth: 1,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            },
+          });
+        const addLine = (coordinates: unknown[], suffix = "") =>
+          v.entities.add({
+            id: `${base}${suffix}`,
+            polyline: {
+              positions: coordinates.map(point),
+              width: 3,
+              material: color,
+              clampToGround: true,
+            },
+          });
+        const addPolygon = (coordinates: unknown[][], suffix = "") =>
+          v.entities.add({
+            id: `${base}${suffix}`,
+            polygon: {
+              hierarchy: new C.PolygonHierarchy(
+                coordinates[0].map(point),
+                coordinates
+                  .slice(1)
+                  .map((hole) => new C.PolygonHierarchy(hole.map(point))),
+              ),
+              material: color.withAlpha(layer.opacity * 0.32),
+              outline: true,
+              outlineColor: color,
+              height: 0.5,
+            },
+          });
+        const coordinates = feature.geometry.coordinates as unknown[];
+        switch (feature.geometry.type) {
+          case "Point":
+            addPoint(coordinates);
+            break;
+          case "MultiPoint":
+            coordinates.forEach((value, i) => addPoint(value, `:${i}`));
+            break;
+          case "LineString":
+            addLine(coordinates);
+            break;
+          case "MultiLineString":
+            coordinates.forEach((value, i) =>
+              addLine(value as unknown[], `:${i}`),
+            );
+            break;
+          case "Polygon":
+            addPolygon(coordinates as unknown[][]);
+            break;
+          case "MultiPolygon":
+            coordinates.forEach((value, i) =>
+              addPolygon(value as unknown[][], `:${i}`),
+            );
+            break;
+        }
+      });
+    }
+    v.scene.requestRender();
+  }, [props.project.dataLayers]);
+  useEffect(() => {
+    const v = viewer.current;
+    if (!v) return;
     const w = new Worker(new URL("./geometry.worker.ts", import.meta.url), {
       type: "module",
     });
@@ -380,9 +719,32 @@ export function Viewport(props: Props) {
         return;
       }
       for (const e of [...v.entities.values])
-        if (e.id.startsWith("_surface")) v.entities.remove(e);
+        if (e.id.startsWith("_surface") || e.id.startsWith("_sidewalk"))
+          v.entities.remove(e);
       let i = 0;
-      for (const s of data.surfaces)
+      for (const s of data.surfaces) {
+        for (const poly of s.sidewalks) {
+          const ring = (r: Point[]) =>
+            r.map((q) =>
+              C.Cartesian3.fromDegrees(...toGeo(q, props.project.origin)),
+            );
+          v.entities.add({
+            id: `_sidewalk${i++}`,
+            show: props.visible.road && props.opacity.road > 0,
+            polygon: {
+              hierarchy: new C.PolygonHierarchy(
+                ring(poly[0]),
+                poly
+                  .slice(1)
+                  .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
+              ),
+              height: s.elevation + 0.08,
+              material: C.Color.fromCssColorString("#d9d7cf").withAlpha(
+                props.opacity.road,
+              ),
+            },
+          });
+        }
         for (const poly of s.polygons) {
           const ring = (r: Point[]) =>
             r.map((q) =>
@@ -398,13 +760,14 @@ export function Viewport(props: Props) {
                   .slice(1)
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
-              height: s.elevation + 0.1,
-              material: C.Color.fromCssColorString("#54616a").withAlpha(
+              height: s.elevation + 0.14,
+              material: C.Color.fromCssColorString("#3f474d").withAlpha(
                 props.opacity.road,
               ),
             },
           });
         }
+      }
       v.scene.requestRender();
     };
     w.postMessage({

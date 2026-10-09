@@ -11,6 +11,12 @@ self.onmessage = ({ data }) => {
       id: data.id,
       surfaces: [...groups].map(([elevation, roads]) => ({
         elevation,
+        sidewalks: roadSurface(
+          roads.map((road: { width: number }) => ({
+            ...road,
+            width: road.width + 3.2,
+          })),
+        ),
         polygons: roadSurface(roads),
       })),
     });
