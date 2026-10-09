@@ -93,6 +93,11 @@ export default function App() {
     [visible, setVisible] = useState(
       Object.fromEntries(kinds.map((k) => [k, true])) as Record<Kind, boolean>,
     ),
+    [opacity, setOpacity] = useState<Record<Kind, number>>(
+      Object.fromEntries(kinds.map((k) => [k, 1])) as Record<Kind, number>,
+    ),
+    [layerOrder, setLayerOrder] = useState<Kind[]>([...kinds]),
+    [engine, setEngine] = useState("Cesium 3D"),
     [status, setStatus] = useState(boot.status),
     [error, setError] = useState(boot.error),
     [context, setContext] = useState("Loading map…"),
@@ -322,6 +327,19 @@ export default function App() {
         <span className={`save-state ${status === "Saved" ? "saved" : ""}`}>
           ● {status}
         </span>
+        <select
+          className="engine-picker"
+          value={engine}
+          onChange={(e) => {
+            setEngine(e.target.value);
+            setContext(`${e.target.value} view · synced to project`);
+          }}
+          aria-label="Rendering engine"
+        >
+          <option>Cesium 3D</option>
+          <option disabled>MapLibre (coming soon)</option>
+          <option disabled>Mapbox (coming soon)</option>
+        </select>
         <button
           onClick={save}
           disabled={status === "Saving…"}
@@ -359,32 +377,77 @@ export default function App() {
               <option value="server">Local API server</option>
             </select>
           </label>
-          <div className="section-title">
-            <Layers size={15} /> Project layers{" "}
-            <span>{project.objects.length}</span>
+          <div className="section-title layer-heading">
+            <Layers size={15} /> Layers <span>{project.objects.length}</span>
           </div>
           <div className="layers">
-            {kinds.map((k) => {
+            {layerOrder.map((k, index) => {
               const Icon = icons[k];
               return (
-                <div key={k} className="layer">
-                  <input
-                    aria-label={`Show ${k} layer`}
-                    type="checkbox"
-                    checked={visible[k]}
-                    onChange={(e) =>
-                      setVisible({ ...visible, [k]: e.target.checked })
-                    }
-                  />
-                  <Icon size={15} />
-                  <span>
-                    {k === "boundary"
-                      ? "Site boundary"
-                      : k[0].toUpperCase() + k.slice(1)}
-                  </span>
-                  <small>
-                    {project.objects.filter((o) => o.kind === k).length}
-                  </small>
+                <div key={k} className="layer-card">
+                  <div className="layer">
+                    <input
+                      aria-label={`Show ${k} layer`}
+                      type="checkbox"
+                      checked={visible[k]}
+                      onChange={(e) =>
+                        setVisible({ ...visible, [k]: e.target.checked })
+                      }
+                    />
+                    <Icon size={15} />
+                    <span>
+                      {k === "boundary"
+                        ? "Site boundary"
+                        : k[0].toUpperCase() + k.slice(1)}
+                    </span>
+                    <small>
+                      {project.objects.filter((o) => o.kind === k).length}
+                    </small>
+                    <button
+                      className="icon-button"
+                      aria-label={`Move ${k} layer up`}
+                      disabled={index === 0}
+                      onClick={() => {
+                        const next = [...layerOrder];
+                        [next[index - 1], next[index]] = [
+                          next[index],
+                          next[index - 1],
+                        ];
+                        setLayerOrder(next);
+                      }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label={`Move ${k} layer down`}
+                      disabled={index === layerOrder.length - 1}
+                      onClick={() => {
+                        const next = [...layerOrder];
+                        [next[index], next[index + 1]] = [
+                          next[index + 1],
+                          next[index],
+                        ];
+                        setLayerOrder(next);
+                      }}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  <label className="layer-opacity">
+                    Opacity{" "}
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={opacity[k]}
+                      onChange={(e) =>
+                        setOpacity({ ...opacity, [k]: Number(e.target.value) })
+                      }
+                    />
+                    <span>{Math.round(opacity[k] * 100)}%</span>
+                  </label>
                 </div>
               );
             })}
@@ -430,6 +493,7 @@ export default function App() {
             project={project}
             selected={selected}
             visible={visible}
+            opacity={opacity}
             draft={draft}
             onClick={click}
             onMove={moveObject}

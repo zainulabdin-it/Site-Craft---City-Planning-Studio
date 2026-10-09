@@ -109,6 +109,14 @@ header {
 .save-state.saved {
   color: #2c8461;
 }
+.engine-picker {
+  border: 1px solid #dce3df;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: #49665b;
+  background: #f8fbf8;
+  font-size: 11px;
+}
 .workspace {
   flex: 1;
   display: grid;
@@ -179,6 +187,42 @@ h2 {
   gap: 9px;
   height: 30px;
   font-size: 11px;
+}
+.layer-card {
+  border: 1px solid #e3e9e4;
+  border-radius: 7px;
+  padding: 5px 7px 6px;
+  margin-bottom: 6px;
+  background: #fbfdfb;
+}
+.layer-card .layer {
+  height: 25px;
+}
+.layer-opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a9a91;
+  font-size: 9px;
+  padding-left: 24px;
+}
+.layer-opacity input {
+  flex: 1;
+  accent-color: #22735b;
+}
+.layer-opacity span {
+  width: 27px;
+  text-align: right;
+}
+.icon-button {
+  border: 0;
+  background: transparent;
+  padding: 2px 3px;
+  font-size: 11px;
+  color: #7c9589;
+}
+.icon-button:hover {
+  background: #e6f1eb;
 }
 .layer input {
   accent-color: #22735b;

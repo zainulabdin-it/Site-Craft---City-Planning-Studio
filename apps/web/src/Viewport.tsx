@@ -20,6 +20,7 @@ export type ViewAction = {
 interface Props {
   project: Project;
   visible: Record<Kind, boolean>;
+  opacity: Record<Kind, number>;
   selected: string;
   draft: Point[];
   onClick: (p: Point, id?: string) => void;
@@ -218,7 +219,9 @@ export function Viewport(props: Props) {
             (o.kind === "boundary"
               ? C.Color.fromCssColorString("#f7faf5")
               : color
-            ).withAlpha(o.kind === "boundary" ? 0.96 : 0.12),
+            ).withAlpha(
+              (o.kind === "boundary" ? 0.96 : 0.12) * props.opacity[o.kind],
+            ),
           );
           e.polyline = {
             positions: [...o.points, o.points[0]].map((q) => position(q, 0.3)),
@@ -229,14 +232,16 @@ export function Viewport(props: Props) {
           e.polyline = {
             positions: o.points.map((q) => position(q, o.elevation + 0.3)),
             width: 3,
-            material: selected ? C.Color.YELLOW : C.Color.WHITE.withAlpha(0.75),
+            material: selected
+              ? C.Color.YELLOW
+              : C.Color.WHITE.withAlpha(0.75 * props.opacity[o.kind]),
           };
         } else if (o.kind === "building") {
           e.polygon = polygon(
             footprint(o),
             o.elevation + 0.2,
             o.floors * o.floorHeight,
-            color,
+            color.withAlpha(props.opacity[o.kind]),
           );
           if (o.roof === "pitched") {
             const ring = footprint(o),
@@ -260,7 +265,9 @@ export function Viewport(props: Props) {
                     center,
                   ]),
                   perPositionHeight: true,
-                  material: C.Color.fromCssColorString("#66594c"),
+                  material: C.Color.fromCssColorString("#66594c").withAlpha(
+                    props.opacity[o.kind],
+                  ),
                 },
               });
           }
@@ -292,8 +299,12 @@ export function Viewport(props: Props) {
               ),
               material:
                 o.kind === "car"
-                  ? C.Color.fromCssColorString("#d99152")
-                  : C.Color.fromCssColorString("#8d9ca0"),
+                  ? C.Color.fromCssColorString("#d99152").withAlpha(
+                      props.opacity[o.kind],
+                    )
+                  : C.Color.fromCssColorString("#8d9ca0").withAlpha(
+                      props.opacity[o.kind],
+                    ),
             };
         }
         entity = v.entities.add(e as C.Entity.ConstructorOptions);
@@ -308,7 +319,7 @@ export function Viewport(props: Props) {
         entity.polyline.material = new C.ColorMaterialProperty(
           o.id === props.selected
             ? C.Color.YELLOW
-            : C.Color.WHITE.withAlpha(0.75),
+            : C.Color.WHITE.withAlpha(0.75 * props.opacity[o.kind]),
         );
     }
     // A single transient highlight avoids mutating stored design objects.
@@ -343,7 +354,13 @@ export function Viewport(props: Props) {
         },
       });
     v.scene.requestRender();
-  }, [props.project, props.visible, props.selected, props.draft]);
+  }, [
+    props.project,
+    props.visible,
+    props.opacity,
+    props.selected,
+    props.draft,
+  ]);
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
@@ -367,7 +384,7 @@ export function Viewport(props: Props) {
             );
           v.entities.add({
             id: `_surface${i++}`,
-            show: props.visible.road,
+            show: props.visible.road && props.opacity.road > 0,
             polygon: {
               hierarchy: new C.PolygonHierarchy(
                 ring(poly[0]),
@@ -376,7 +393,9 @@ export function Viewport(props: Props) {
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
               height: s.elevation + 0.1,
-              material: C.Color.fromCssColorString("#54616a"),
+              material: C.Color.fromCssColorString("#54616a").withAlpha(
+                props.opacity.road,
+              ),
             },
           });
         }
@@ -387,7 +406,7 @@ export function Viewport(props: Props) {
       roads: props.project.objects.filter((o) => o.kind === "road"),
     });
     return () => w.terminate();
-  }, [roadKey, props.visible.road]);
+  }, [roadKey, props.visible.road, props.opacity.road]);
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
