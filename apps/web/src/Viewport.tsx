@@ -408,7 +408,7 @@ export function Viewport(props: Props) {
               selected,
               28,
               color,
-              0.58,
+              0.12,
             );
           } else {
             e.polygon = polygon(

@@ -1432,7 +1432,7 @@ function Properties({
             </select>
           </label>
           <label className="field">
-            Facade colour
+            Facade tint
             <input
               type="color"
               value={o.color}
