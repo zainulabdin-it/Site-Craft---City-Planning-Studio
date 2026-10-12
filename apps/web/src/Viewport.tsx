@@ -357,7 +357,7 @@ export function Viewport(props: Props) {
           const water =
             o.kind === "plot" &&
             (o.name.toLowerCase().includes("water") ||
-              o.name.toLowerCase().includes("river") ||
+              o.name.toLowerCase().includes("pond") ||
               o.name.toLowerCase().includes("canal"));
           e.polygon = polygon(
             o.points,
