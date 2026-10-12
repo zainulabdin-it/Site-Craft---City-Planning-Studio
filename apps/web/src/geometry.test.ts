@@ -25,6 +25,13 @@ describe("metric geometry and project commands", () => {
     expect(resized.points[0]).toEqual([2, 1]);
     expect(footprint(resized)[0]).toEqual([-6, -8]);
   });
+  it("scales a point asset from its map handle", () => {
+    const p = newProject(),
+      car = newObject(p, "car", [[10, 10]]),
+      resized = resizeFromHandle(car, -1, [16, 10]);
+    expect(resized.scale).toBe(2);
+    expect(resized.points[0]).toEqual([10, 10]);
+  });
   it("migrates schema v1 projects to v2 without changing design objects", () => {
     const current = demoProject();
     const legacy = {

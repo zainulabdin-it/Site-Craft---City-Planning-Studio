@@ -1323,13 +1323,9 @@ function Properties({
           <Trash2 size={15} />
         </button>
       </div>
-      {["boundary", "plot", "road", "building", "bridge"].includes(
-        o.kind,
-      ) && (
-        <p className="muted small">
-          Map par blue points ko drag karke shape ya size adjust karein.
-        </p>
-      )}
+      <p className="muted small">
+        Map par blue point ko drag karke shape ya size adjust karein.
+      </p>
       {o.kind === "road" && (
         <>
           <div className="measure">

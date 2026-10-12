@@ -105,6 +105,13 @@ export function resizeFromHandle(
   handle: number,
   target: Point,
 ): DesignObject {
+  if (["tree", "car", "bench"].includes(o.kind) && handle === -1) {
+    const base = o.kind === "tree" ? 4 : o.kind === "car" ? 3 : 2.5;
+    return {
+      ...o,
+      scale: Math.max(0.2, Math.min(5, distance(o.points[0], target) / base)),
+    };
+  }
   if (!["building", "bridge"].includes(o.kind)) {
     if (handle < 0 || handle >= o.points.length) return o;
     return {

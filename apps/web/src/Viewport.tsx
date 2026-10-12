@@ -715,12 +715,31 @@ export function Viewport(props: Props) {
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       });
-      const handles = ["building", "bridge"].includes(selected.kind)
-        ? footprint(selected)
+      const handles: { point: Point; index: number }[] = [
+        "building",
+        "bridge",
+      ].includes(selected.kind)
+        ? footprint(selected).map((point, index) => ({ point, index }))
         : ["boundary", "plot", "road"].includes(selected.kind)
-          ? selected.points
-          : [];
-      handles.forEach((point, index) =>
+          ? selected.points.map((point, index) => ({ point, index }))
+          : ["tree", "car", "bench"].includes(selected.kind)
+            ? [
+                {
+                  point: [
+                    selected.points[0][0] +
+                      selected.scale *
+                        (selected.kind === "tree"
+                          ? 4
+                          : selected.kind === "car"
+                            ? 3
+                            : 2.5),
+                    selected.points[0][1],
+                  ],
+                  index: -1,
+                },
+              ]
+            : [];
+      handles.forEach(({ point, index }) =>
         v.entities.add({
           id: `_handle:${selected.id}:${index}`,
           position: position(point, 1.5),
