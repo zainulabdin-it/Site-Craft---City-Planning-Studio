@@ -351,16 +351,47 @@ export function demoProject() {
           ],
       ),
   ];
-  homes.forEach(([x, y, rotation, variant], index) =>
+  homes.forEach(([x, y, rotation, variant], index) => {
+    const width = variant === "t" ? 19 : 16,
+      depth = variant === "t" ? 13 : 12;
     add("building", [[x, y]], `Garden Lane home ${index + 1}`, {
-      width: variant === "t" ? 19 : 16,
-      depth: variant === "t" ? 13 : 12,
+      width,
+      depth,
       floors: 2,
       roof: "pitched",
       rotation,
       assetRef: `kenney:house:${variant}`,
       color: ["#ef8354", "#3f9ed8", "#f2c14e", "#55ad68"][index % 4],
-    }),
+    });
+    const houseEdge = y > 96 ? y - depth / 2 : y + depth / 2,
+      roadEdge = y > 96 ? 100 : 92;
+    add(
+      "road",
+      [
+        [x, roadEdge],
+        [x, houseEdge],
+      ],
+      `Driveway · Garden Lane home ${index + 1}`,
+      { width: Math.max(3.2, width * 0.22), lanes: 1 },
+    );
+  });
+  add(
+    "road",
+    [
+      [-118, 7],
+      [-118, 26],
+    ],
+    "Community park entrance road",
+    { width: 6, lanes: 1 },
+  );
+  add(
+    "road",
+    [
+      [-58, 7],
+      [-58, 28],
+    ],
+    "Park parking access",
+    { width: 6, lanes: 1 },
   );
   add("building", [[-58, -42]], "Neighbourhood market", {
     width: 36,
@@ -369,6 +400,15 @@ export function demoProject() {
     buildingType: "Commercial",
     color: "#f2c94c",
   });
+  add(
+    "road",
+    [
+      [-58, -7],
+      [-58, -30],
+    ],
+    "Neighbourhood market access",
+    { width: 6, lanes: 1 },
+  );
   add("building", [[66, -48]], "Mixed-use apartments", {
     width: 42,
     depth: 28,
@@ -376,6 +416,15 @@ export function demoProject() {
     buildingType: "Apartment",
     color: "#e9b52f",
   });
+  add(
+    "road",
+    [
+      [66, -7],
+      [66, -34],
+    ],
+    "Apartment entrance road",
+    { width: 7, lanes: 1 },
+  );
 
   [
     [108, 34],

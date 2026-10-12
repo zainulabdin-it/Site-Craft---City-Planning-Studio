@@ -384,6 +384,7 @@ export function Viewport(props: Props) {
           };
         } else if (o.kind === "road") {
           e.polyline = {
+            show: o.lanes > 1 || selected,
             positions: o.points.map((q) => position(q, o.elevation + 0.3)),
             width: selected ? 5 : 2.5,
             material: selected

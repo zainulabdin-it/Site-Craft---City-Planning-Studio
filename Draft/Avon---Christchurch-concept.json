@@ -2042,6 +2042,614 @@
       "buildingType": "Detached house",
       "color": "#697782",
       "assetRef": "builtin:bridge:arch"
+    },
+    {
+      "id": "c70486a5-e271-4a9d-a8b2-28ab460f1117",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 1",
+      "points": [
+        [
+          -198,
+          100
+        ],
+        [
+          -198,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "0f25e6ab-43c8-4f2f-8aff-b34f50767f10",
+        "43c41ee3-7f0e-439c-b6f9-3231e1224fad"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "0f198a6f-80b2-4823-9016-af37f54b1423",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 2",
+      "points": [
+        [
+          -158,
+          100
+        ],
+        [
+          -158,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "a758f0e3-145c-4ca8-af4c-6b10ee3fdc57",
+        "df6a1cd9-b909-468d-a8b5-a17f6836f8d1"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "5e9b4f30-c3ff-4e2f-afca-f46758882565",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 3",
+      "points": [
+        [
+          -118,
+          100
+        ],
+        [
+          -118,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "6626de59-0f6e-4005-97b1-f16343ec3e92",
+        "859b9c47-991d-4922-a979-83b7ea9fa16d"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "5069dda4-9f6f-4640-bb74-820cad5b34ad",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 4",
+      "points": [
+        [
+          -78,
+          100
+        ],
+        [
+          -78,
+          115.5
+        ]
+      ],
+      "nodeIds": [
+        "4d3fb007-5a9b-4340-8405-927fd2cdcca9",
+        "787969a9-ba31-42fd-9032-8d05d35ea369"
+      ],
+      "width": 4.18,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "75485bb3-b3dd-4e53-a074-8b337caf57a6",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 5",
+      "points": [
+        [
+          -38,
+          100
+        ],
+        [
+          -38,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "cde6e1e9-471e-4d25-a657-1e7ef9b90b87",
+        "29653057-decc-48d4-b9ba-cd64286673ef"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "e54b4b95-2c5b-4fe3-af8a-feb7dcdfd5a8",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 6",
+      "points": [
+        [
+          38,
+          100
+        ],
+        [
+          38,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "b727419c-2c9d-454b-91ca-4e3dee4c99d5",
+        "9c580760-6ef5-4958-9415-6273717ee8eb"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "a955f5e1-2292-463d-8508-e03736b9f1d4",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 7",
+      "points": [
+        [
+          78,
+          100
+        ],
+        [
+          78,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "a4d3ef5f-b6a5-415f-af1c-4a69cd2a8d30",
+        "bd499f5c-d5ac-4deb-9544-bd36dd64957d"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "bef970d0-5858-4e7a-8af7-60fe62529358",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 8",
+      "points": [
+        [
+          118,
+          100
+        ],
+        [
+          118,
+          115.5
+        ]
+      ],
+      "nodeIds": [
+        "2e16047c-6bd3-42c8-8cdc-c1b3aaed3ae2",
+        "ff8eec52-baa4-493b-a152-5285be4a5861"
+      ],
+      "width": 4.18,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "cdbc2479-4f8b-4523-8c53-d6ca87beb550",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 9",
+      "points": [
+        [
+          158,
+          100
+        ],
+        [
+          158,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "fcf5c998-76a0-4cdc-9563-55d69793f962",
+        "10df5ac8-5581-48e4-8d86-68c681aaf80c"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "2d54c1ee-9df7-4bd0-acf3-72c79dd67a5b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 10",
+      "points": [
+        [
+          198,
+          100
+        ],
+        [
+          198,
+          116.0
+        ]
+      ],
+      "nodeIds": [
+        "afc93bcf-7f53-4036-ac1d-81d3a80465b8",
+        "8d779b2a-c4ce-429d-8477-11b922872a9c"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "2ce9bd1c-96cd-40b3-afaf-4ce1bcc7db86",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 11",
+      "points": [
+        [
+          38,
+          92
+        ],
+        [
+          38,
+          76.0
+        ]
+      ],
+      "nodeIds": [
+        "76c3ec2a-398c-4a28-94e2-2513152bad6c",
+        "f25defc6-81ca-4dd9-a7c9-d99b57648497"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "b93bf41f-0fae-4ede-8908-d768521c6175",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 12",
+      "points": [
+        [
+          78,
+          92
+        ],
+        [
+          78,
+          76.0
+        ]
+      ],
+      "nodeIds": [
+        "6ef898d1-a30c-4cb0-bc2b-093c667aedb8",
+        "7aad617c-0213-464d-b3ae-372217bce14f"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "12c45067-3d63-4f99-a9fb-7477d8bf05fc",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 13",
+      "points": [
+        [
+          118,
+          92
+        ],
+        [
+          118,
+          76.0
+        ]
+      ],
+      "nodeIds": [
+        "0bf1802f-ff95-475b-803c-2ff0137c2a73",
+        "71b307d9-3bc2-4b1d-89d6-974d6261925b"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "4935fae9-ad20-4006-b17d-0cf5289c5c02",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 14",
+      "points": [
+        [
+          158,
+          92
+        ],
+        [
+          158,
+          76.5
+        ]
+      ],
+      "nodeIds": [
+        "dec48bd2-367c-4a8e-b8dd-5678d6917435",
+        "576238d6-68be-4044-9867-1587c385dbb3"
+      ],
+      "width": 4.18,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "c84ef45b-dc53-49ee-80b0-6269253cd5bf",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Driveway · Garden Lane home 15",
+      "points": [
+        [
+          198,
+          92
+        ],
+        [
+          198,
+          76.0
+        ]
+      ],
+      "nodeIds": [
+        "b7593259-9e3b-4749-acdf-73ee0e3f15d8",
+        "830cb4df-71b8-48b6-883f-24d8be70b5d6"
+      ],
+      "width": 3.52,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "c5799b28-f3f4-45e3-9776-3e789d56da5f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Community park entrance road",
+      "points": [
+        [
+          -118,
+          7
+        ],
+        [
+          -118,
+          26
+        ]
+      ],
+      "nodeIds": [
+        "49892324-ec2b-43c6-8a01-887b559c546f",
+        "ac85d348-0d0f-4431-89b9-dcb6dde5a8d7"
+      ],
+      "width": 6,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "db30f70b-8f42-433e-aa2e-95ffaaaa840a",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Park parking access",
+      "points": [
+        [
+          -58,
+          7
+        ],
+        [
+          -58,
+          28
+        ]
+      ],
+      "nodeIds": [
+        "6d916488-cd89-407e-8fc7-8023283f56bf",
+        "4c9e713a-a575-441d-ac99-2fa945dcfec2"
+      ],
+      "width": 6,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "8e301b6f-5d18-41a8-b6af-f69ffbbd4119",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Neighbourhood market access",
+      "points": [
+        [
+          -58,
+          -7
+        ],
+        [
+          -58,
+          -30
+        ]
+      ],
+      "nodeIds": [
+        "f57ccbb8-7aac-497c-92ff-e941026db63f",
+        "dc4b4818-2b4b-4632-831b-4006eeeabf5c"
+      ],
+      "width": 6,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "3d57174c-30d9-40bf-ba83-846e8219c1f9",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Apartment entrance road",
+      "points": [
+        [
+          66,
+          -7
+        ],
+        [
+          66,
+          -34
+        ]
+      ],
+      "nodeIds": [
+        "c1edc95a-62c5-4cbe-a8ab-e799f8bc58bb",
+        "e33a95b0-2f0a-478c-99e9-4fcf92f0bcab"
+      ],
+      "width": 7,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
     }
   ],
   "dataLayers": [],
