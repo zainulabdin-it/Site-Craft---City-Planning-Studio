@@ -100,6 +100,50 @@ export function footprint(o: DesignObject): Point[] {
     c[1] + scale * (x * Math.sin(r) + y * Math.cos(r)),
   ]);
 }
+export function resizeFromHandle(
+  o: DesignObject,
+  handle: number,
+  target: Point,
+): DesignObject {
+  if (!["building", "bridge"].includes(o.kind)) {
+    if (handle < 0 || handle >= o.points.length) return o;
+    return {
+      ...o,
+      points: o.points.map((point, index) =>
+        index === handle ? target : point,
+      ),
+    };
+  }
+  const corners = footprint(o),
+    opposite = corners[(handle + 2) % 4],
+    rotation = (o.rotation * Math.PI) / 180,
+    cos = Math.cos(rotation),
+    sin = Math.sin(rotation),
+    dx = target[0] - opposite[0],
+    dy = target[1] - opposite[1],
+    localX = dx * cos + dy * sin,
+    localY = -dx * sin + dy * cos,
+    scale = o.kind === "bridge" ? o.scale : 1,
+    width = Math.max(1, Math.min(100, Math.abs(localX) / scale)),
+    depth = Math.max(1, Math.min(100, Math.abs(localY) / scale)),
+    signX = Math.sign(localX) || (handle === 0 || handle === 3 ? -1 : 1),
+    signY = Math.sign(localY) || (handle < 2 ? -1 : 1),
+    adjustedX = signX * width * scale,
+    adjustedY = signY * depth * scale,
+    adjusted: Point = [
+      opposite[0] + adjustedX * cos - adjustedY * sin,
+      opposite[1] + adjustedX * sin + adjustedY * cos,
+    ];
+  return {
+    ...o,
+    points: [[
+      (opposite[0] + adjusted[0]) / 2,
+      (opposite[1] + adjusted[1]) / 2,
+    ]],
+    width,
+    depth,
+  };
+}
 export function validateProject(input: unknown): Project {
   const version = (input as { schemaVersion?: unknown })?.schemaVersion;
   const p =

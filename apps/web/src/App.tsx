@@ -51,6 +51,7 @@ import {
   area,
   distance,
   moveTo,
+  resizeFromHandle,
 } from "./geometry";
 import { command, applyCommand, type Command } from "./history";
 import {
@@ -313,6 +314,14 @@ export default function App() {
     if (!object || object.kind === "boundary") return;
     setSelected(id);
     updateConnected(moveTo(object, anchor));
+  };
+  const resizeObject = (id: string, handle: number, target: Point) => {
+    const object = project.objects.find((o) => o.id === id);
+    if (!object) return;
+    setSelected(id);
+    const resized = resizeFromHandle(object, handle, target);
+    if (object.kind === "road") updateConnected(resized);
+    else edit([resized], [], "Resize object");
   };
   const save = async () => {
     const captured = version.current;
@@ -794,6 +803,7 @@ export default function App() {
             draft={draft}
             onClick={click}
             onMove={moveObject}
+            onResize={resizeObject}
             onError={setError}
             onContext={setContext}
             action={action}
@@ -1313,6 +1323,13 @@ function Properties({
           <Trash2 size={15} />
         </button>
       </div>
+      {["boundary", "plot", "road", "building", "bridge"].includes(
+        o.kind,
+      ) && (
+        <p className="muted small">
+          Map par blue points ko drag karke shape ya size adjust karein.
+        </p>
+      )}
       {o.kind === "road" && (
         <>
           <div className="measure">
@@ -1481,8 +1498,8 @@ function Properties({
       )}
       {o.kind === "bridge" && (
         <p className="muted small">
-          Fixed concept deck, 10 × 30 m, 5 m ellipsoid offset. No approaches,
-          clearance or structural checks.
+          Blue corner handles se deck ki width aur length adjust karein. No
+          approaches, clearance or structural checks.
         </p>
       )}
       <details>

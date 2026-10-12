@@ -7,7 +7,7 @@ import {
   type Kind,
   type DesignObject,
 } from "./model";
-import { toGeo, toLocal, footprint } from "./geometry";
+import { toGeo, toLocal, footprint, area, length } from "./geometry";
 export type ViewAction = {
   type: "frame" | "top" | "perspective" | "location" | "zoom-in" | "zoom-out";
   id?: string;
@@ -25,6 +25,7 @@ interface Props {
   draft: Point[];
   onClick: (p: Point, id?: string) => void;
   onMove: (id: string, p: Point) => void;
+  onResize: (id: string, handle: number, p: Point) => void;
   onError: (s: string) => void;
   action: ViewAction;
   onContext: (s: string) => void;
@@ -120,11 +121,14 @@ export function Viewport(props: Props) {
       orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
     });
     const h = new C.ScreenSpaceEventHandler(v.canvas);
+    const pickedIds = (position: C.Cartesian2) =>
+      v.scene
+        .drillPick(position)
+        .map((hit) => hit?.id?.id)
+        .filter((id): id is string => typeof id === "string");
     const objectAt = (position: C.Cartesian2) => {
       const ids = new Set(latest.current.project.objects.map((o) => o.id));
-      for (const hit of v.scene.drillPick(position)) {
-        const raw = hit?.id?.id;
-        if (typeof raw !== "string") continue;
+      for (const raw of pickedIds(position)) {
         const id = raw.replace(/:.*$/, "");
         if (ids.has(id)) return id;
       }
@@ -140,36 +144,116 @@ export function Viewport(props: Props) {
       );
     };
     h.setInputAction((e: { position: C.Cartesian2 }) => {
+      if (pickedIds(e.position).some((id) => id.startsWith("_handle:"))) return;
       const p = groundAt(e.position);
       if (p) latest.current.onClick(p, objectAt(e.position));
     }, C.ScreenSpaceEventType.LEFT_CLICK);
     let drag:
-      { id: string; start: C.Cartesian2; end: C.Cartesian2 } | undefined;
+      | { kind: "move"; id: string; start: C.Cartesian2; end: C.Cartesian2 }
+      | {
+          kind: "resize";
+          id: string;
+          handle: number;
+          start: C.Cartesian2;
+          end: C.Cartesian2;
+        }
+      | undefined;
+    let hovered = "";
     h.setInputAction((e: { position: C.Cartesian2 }) => {
+      const handleRaw = pickedIds(e.position).find((id) =>
+        id.startsWith("_handle:"),
+      );
+      if (handleRaw) {
+        const [, id, index] = handleRaw.split(":");
+        drag = {
+          kind: "resize",
+          id,
+          handle: Number(index),
+          start: C.Cartesian2.clone(e.position),
+          end: C.Cartesian2.clone(e.position),
+        };
+        v.scene.screenSpaceCameraController.enableInputs = false;
+        return;
+      }
       const id = objectAt(e.position),
         object = latest.current.project.objects.find((o) => o.id === id);
       if (!id || object?.kind === "boundary") return;
       drag = {
+        kind: "move",
         id,
         start: C.Cartesian2.clone(e.position),
         end: C.Cartesian2.clone(e.position),
       };
+      v.scene.screenSpaceCameraController.enableInputs = false;
     }, C.ScreenSpaceEventType.LEFT_DOWN);
     h.setInputAction((e: { endPosition: C.Cartesian2 }) => {
-      if (drag) drag.end = C.Cartesian2.clone(e.endPosition);
+      if (drag) {
+        drag.end = C.Cartesian2.clone(e.endPosition);
+        return;
+      }
+      const id = objectAt(e.endPosition);
+      if (id === hovered) return;
+      hovered = id || "";
+      v.entities.removeById("_hover");
+      const object = latest.current.project.objects.find((o) => o.id === id);
+      if (!object) {
+        v.scene.requestRender();
+        return;
+      }
+      const [longitude, latitude] = toGeo(
+          object.points[0],
+          latest.current.project.origin,
+        ),
+        [east, north] = object.points[0],
+        dimensions =
+          object.kind === "road"
+            ? `${length(object.points).toFixed(1)} m long · ${object.width.toFixed(1)} m wide`
+            : ["boundary", "plot"].includes(object.kind)
+              ? `${area(object.points).toFixed(0)} m² · ${object.points.length} points`
+              : ["building", "bridge"].includes(object.kind)
+                ? `${object.width.toFixed(1)} × ${object.depth.toFixed(1)} m`
+                : `Scale ${object.scale.toFixed(1)}× · Rotation ${object.rotation.toFixed(0)}°`,
+        height =
+          object.kind === "building"
+            ? object.floors * object.floorHeight + 5
+            : 5;
+      v.entities.add({
+        id: "_hover",
+        position: C.Cartesian3.fromDegrees(longitude, latitude, height),
+        label: {
+          text: `${object.name} · ${object.kind}\nLon ${longitude.toFixed(6)} · Lat ${latitude.toFixed(6)}\nE ${east.toFixed(1)} m · N ${north.toFixed(1)} m\n${dimensions}`,
+          font: "600 13px DM Sans, sans-serif",
+          fillColor: C.Color.WHITE,
+          outlineColor: C.Color.fromCssColorString("#0f172a"),
+          outlineWidth: 2,
+          style: C.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: C.Color.fromCssColorString("#172554").withAlpha(0.94),
+          backgroundPadding: new C.Cartesian2(10, 8),
+          pixelOffset: new C.Cartesian2(0, -24),
+          verticalOrigin: C.VerticalOrigin.BOTTOM,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+      v.scene.requestRender();
     }, C.ScreenSpaceEventType.MOUSE_MOVE);
     h.setInputAction((e: { position: C.Cartesian2 }) => {
       if (!drag) return;
       const moved = C.Cartesian2.distance(drag.start, drag.end) > 4,
         p = moved ? groundAt(e.position) : undefined,
-        id = drag.id;
+        current = drag;
       drag = undefined;
-      if (p) latest.current.onMove(id, p);
+      v.scene.screenSpaceCameraController.enableInputs = true;
+      if (!p) return;
+      if (current.kind === "resize")
+        latest.current.onResize(current.id, current.handle, p);
+      else latest.current.onMove(current.id, p);
     }, C.ScreenSpaceEventType.LEFT_UP);
     v.screenSpaceEventHandler.removeInputAction(
       C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK,
     );
     return () => {
+      v.scene.screenSpaceCameraController.enableInputs = true;
       h.destroy();
       v.destroy();
       viewer.current = null;
@@ -610,6 +694,9 @@ export function Viewport(props: Props) {
     }
     // A single transient highlight avoids mutating stored design objects.
     v.entities.removeById("_selection");
+    for (const entity of [...v.entities.values])
+      if (typeof entity.id === "string" && entity.id.startsWith("_handle:"))
+        v.entities.remove(entity);
     const selected = p.objects.find((o) => o.id === props.selected);
     if (selected) {
       v.entities.add({
@@ -628,6 +715,24 @@ export function Viewport(props: Props) {
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       });
+      const handles = ["building", "bridge"].includes(selected.kind)
+        ? footprint(selected)
+        : ["boundary", "plot", "road"].includes(selected.kind)
+          ? selected.points
+          : [];
+      handles.forEach((point, index) =>
+        v.entities.add({
+          id: `_handle:${selected.id}:${index}`,
+          position: position(point, 1.5),
+          point: {
+            pixelSize: 13,
+            color: C.Color.fromCssColorString("#2563eb"),
+            outlineColor: C.Color.WHITE,
+            outlineWidth: 3,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        }),
+      );
     }
     v.entities.removeById("_draft");
     if (props.draft.length > 1)

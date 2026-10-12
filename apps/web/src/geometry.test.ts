@@ -10,9 +10,21 @@ import {
   validateProject,
   footprint,
   moveTo,
+  resizeFromHandle,
 } from "./geometry";
 import { applyCommand, command } from "./history";
 describe("metric geometry and project commands", () => {
+  it("resizes a building from one corner while keeping the opposite corner fixed", () => {
+    const p = newProject(),
+      house = newObject(p, "building", [[0, 0]]);
+    house.width = 12;
+    house.depth = 16;
+    const resized = resizeFromHandle(house, 2, [10, 10]);
+    expect(resized.width).toBe(16);
+    expect(resized.depth).toBe(18);
+    expect(resized.points[0]).toEqual([2, 1]);
+    expect(footprint(resized)[0]).toEqual([-6, -8]);
+  });
   it("migrates schema v1 projects to v2 without changing design objects", () => {
     const current = demoProject();
     const legacy = {
