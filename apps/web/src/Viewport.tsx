@@ -58,12 +58,14 @@ export function Viewport(props: Props) {
         requestRenderMode: true,
         maximumRenderTimeChange: Number.POSITIVE_INFINITY,
         targetFrameRate: 30,
+        shadows: true,
       });
     } catch (e) {
       props.onError(`3D viewport could not start: ${String(e)}`);
       return;
     }
     viewer.current = v;
+    v.scene.shadowMap.softShadows = true;
     v.scene.globe.baseColor = C.Color.fromCssColorString("#e2e8dd");
     v.scene.globe.depthTestAgainstTerrain = false;
     const provider = new C.OpenStreetMapImageryProvider({
@@ -203,12 +205,18 @@ export function Viewport(props: Props) {
       scale: number,
       alpha: number,
       selected: boolean,
+      minimumPixelSize: number,
+      tint = C.Color.WHITE,
     ) => ({
       uri,
       scale,
-      color: C.Color.WHITE.withAlpha(alpha),
-      colorBlendMode: C.ColorBlendMode.HIGHLIGHT,
-      colorBlendAmount: 0,
+      minimumPixelSize,
+      maximumScale: scale * 2.4,
+      color: tint.withAlpha(alpha),
+      colorBlendMode: C.ColorBlendMode.MIX,
+      colorBlendAmount: tint.equals(C.Color.WHITE) ? 0 : 0.38,
+      imageBasedLightingFactor: new C.Cartesian2(1, 1),
+      lightColor: C.Color.WHITE,
       silhouetteColor: selected
         ? C.Color.fromCssColorString("#f8b84b")
         : C.Color.TRANSPARENT,
@@ -272,14 +280,14 @@ export function Viewport(props: Props) {
             o.buildingType === "Detached house" ||
             o.buildingType === "Townhouse";
           const houseUri =
-            o.buildingType === "Townhouse"
+            variant === "t"
               ? "/assets/kenney/suburban/building-type-t.glb"
               : variant === "k"
                 ? "/assets/kenney/suburban/building-type-k.glb"
-                : o.roof === "pitched"
-                  ? "/assets/kenney/suburban/building-type-f.glb"
-                  : "/assets/kenney/suburban/building-type-a.glb";
-          const houseScale = Math.min(o.width, o.depth) * o.scale * 0.62;
+                : variant === "a"
+                  ? "/assets/kenney/suburban/building-type-a.glb"
+                  : "/assets/kenney/suburban/building-type-f.glb";
+          const houseScale = ((o.width + o.depth) / 4) * o.scale;
           if (useHouseModel) {
             e.position = position(o.points[0], o.elevation + houseScale);
             e.orientation = C.Transforms.headingPitchRollQuaternion(
@@ -291,7 +299,21 @@ export function Viewport(props: Props) {
               houseScale,
               props.opacity[o.kind],
               selected,
+              28,
+              color,
             );
+            v.entities.add({
+              id: `${o.id}:foundation`,
+              position: position(o.points[0], o.elevation + 0.12),
+              orientation: e.orientation as C.Quaternion,
+              box: {
+                dimensions: new C.Cartesian3(o.width, o.depth, 0.24),
+                material: C.Color.fromCssColorString("#d6d0c4").withAlpha(
+                  props.opacity[o.kind],
+                ),
+                shadows: C.ShadowMode.ENABLED,
+              },
+            });
           } else {
             e.polygon = polygon(
               footprint(o),
@@ -390,6 +412,7 @@ export function Viewport(props: Props) {
                 treeScale,
                 props.opacity[o.kind],
                 selected,
+                20,
               );
             } else {
               e.ellipsoid = {
@@ -430,6 +453,8 @@ export function Viewport(props: Props) {
                 carScale,
                 props.opacity[o.kind],
                 selected,
+                18,
+                C.Color.fromCssColorString(o.color),
               );
             } else
               e.box = {

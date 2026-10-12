@@ -1106,7 +1106,7 @@ export default function App() {
               ASSET LIBRARY <span>4</span>
             </div>
             <p className="muted small">
-              Original low-detail concept placeholders
+              Editable planning objects with selectable designs
             </p>
             <div className="assets">
               {(["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
@@ -1337,6 +1337,13 @@ function Properties({
                 onUpdate({
                   ...o,
                   buildingType: e.target.value as DesignObject["buildingType"],
+                  assetRef:
+                    e.target.value === "Townhouse"
+                      ? "kenney:house:t"
+                      : e.target.value === "Detached house" &&
+                          !o.assetRef.startsWith("kenney:house:")
+                        ? "kenney:house:f"
+                        : o.assetRef,
                 })
               }
             >
@@ -1358,6 +1365,34 @@ function Properties({
           <div className="field-grid">
             {number("width", "Footprint width (m)", 1, 100)}
             {number("depth", "Footprint depth (m)", 1, 100)}
+          </div>
+          {["Detached house", "Townhouse"].includes(o.buildingType) && (
+            <>
+              <label className="field">
+                House design
+                <select
+                  value={
+                    o.assetRef.startsWith("kenney:house:")
+                      ? o.assetRef
+                      : "kenney:house:f"
+                  }
+                  onChange={(e) => onUpdate({ ...o, assetRef: e.target.value })}
+                >
+                  <option value="kenney:house:a">Modern compact</option>
+                  <option value="kenney:house:f">Suburban gable</option>
+                  <option value="kenney:house:k">Family villa</option>
+                  <option value="kenney:house:t">Townhouse row</option>
+                </select>
+              </label>
+              {number("scale", "3D model size", 0.5, 2, 0.1)}
+            </>
+          )}
+          <div className="measure">
+            <span>Footprint / floor area</span>
+            <b>
+              {(o.width * o.depth).toFixed(0)} m² /{" "}
+              {(o.width * o.depth * o.floors).toFixed(0)} m²
+            </b>
           </div>
           <label className="field">
             Roof
@@ -1432,6 +1467,16 @@ function Properties({
             </select>
           </label>
           {number("scale", "Asset scale", 0.2, 5, 0.1)}
+          {o.kind === "car" && (
+            <label className="field">
+              Vehicle colour
+              <input
+                type="color"
+                value={o.color}
+                onChange={(e) => onUpdate({ ...o, color: e.target.value })}
+              />
+            </label>
+          )}
         </>
       )}
       {o.kind === "bridge" && (

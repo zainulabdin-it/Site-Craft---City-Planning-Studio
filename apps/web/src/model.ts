@@ -150,9 +150,12 @@ export function newObject(
     roof: "flat",
     buildingType: "Detached house",
     color: kind === "building" ? "#d7c8ae" : "#4b7863",
-    assetRef: ["tree", "car", "bench", "bridge"].includes(kind)
-      ? `builtin:${kind}:v1`
-      : "",
+    assetRef:
+      kind === "building"
+        ? "kenney:house:f"
+        : ["tree", "car", "bench", "bridge"].includes(kind)
+          ? `builtin:${kind}:v1`
+          : "",
   };
 }
 export function demoProject() {
@@ -233,27 +236,36 @@ export function demoProject() {
     { color: "#4c9bd6" },
   );
 
+  const homeXs = [-198, -158, -118, -78, -38, 38, 78, 118, 158, 198];
   const homes: Array<[number, number, number, string]> = [
-    [-178, 126, 180, "f"],
-    [-126, 126, 180, "k"],
-    [-72, 126, 180, "f"],
-    [68, 126, 180, "k"],
-    [124, 126, 180, "f"],
-    [178, 126, 180, "k"],
-    [-174, 62, 0, "k"],
-    [-124, 62, 0, "f"],
-    [122, 62, 0, "f"],
-    [176, 62, 0, "k"],
+    ...homeXs.map(
+      (x, index) =>
+        [x, 136, 180, ["a", "f", "k", "t"][index % 4]] as [
+          number,
+          number,
+          number,
+          string,
+        ],
+    ),
+    ...homeXs.map(
+      (x, index) =>
+        [x, 58, 0, ["k", "f", "a", "t"][index % 4]] as [
+          number,
+          number,
+          number,
+          string,
+        ],
+    ),
   ];
   homes.forEach(([x, y, rotation, variant], index) =>
     add("building", [[x, y]], `Garden Lane home ${index + 1}`, {
-      width: 18,
-      depth: 14,
+      width: variant === "t" ? 19 : 16,
+      depth: variant === "t" ? 13 : 12,
       floors: 2,
       roof: "pitched",
       rotation,
       assetRef: `kenney:house:${variant}`,
-      color: index % 2 ? "#d9c5a0" : "#c7d7df",
+      color: ["#e6b8a2", "#b9d5e8", "#d9c5a0", "#c7d7df"][index % 4],
     }),
   );
   add("building", [[-58, -42]], "Neighbourhood market", {
@@ -281,6 +293,12 @@ export function demoProject() {
     [108, 34],
     [154, 36],
     [204, 52],
+    [-210, 118],
+    [-178, 110],
+    [-142, 112],
+    [142, 112],
+    [178, 110],
+    [210, 118],
   ].forEach((point, index) =>
     add("tree", [point as Point], `Street tree ${index + 1}`, {
       assetRef: `kenney:tree:${index % 3 === 0 ? "small" : "large"}`,
@@ -298,13 +316,30 @@ export function demoProject() {
   add("car", [[-92, -4]], "Westbound sedan", {
     assetRef: "kenney:car:sedan",
     rotation: 90,
+    color: "#d94841",
   });
   add("car", [[118, 4]], "Eastbound SUV", {
     assetRef: "kenney:car:suv",
     rotation: -90,
+    color: "#2878c8",
   });
   add("car", [[5, 48]], "Market delivery van", {
     assetRef: "kenney:car:van",
+    color: "#f2c94c",
+  });
+  add("car", [[-176, 4]], "Eastbound compact", {
+    assetRef: "kenney:car:sedan",
+    rotation: -90,
+    color: "#34a853",
+  });
+  add("car", [[176, -4]], "Westbound van", {
+    assetRef: "kenney:car:van",
+    rotation: 90,
+    color: "#f28c28",
+  });
+  add("car", [[-5, 118]], "Garden Lane SUV", {
+    assetRef: "kenney:car:suv",
+    color: "#7f56d9",
   });
   add("bridge", [[0, -100]], "Avon crossing", {
     width: 13,

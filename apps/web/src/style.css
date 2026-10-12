@@ -1025,10 +1025,18 @@ footer {
     display: none;
   }
   .workspace,
-  .workspace.right-collapsed {
+  .workspace.right-collapsed,
+  .workspace.right-open {
     grid-template-columns: minmax(230px, 34vw) minmax(0, 1fr) 0;
   }
-  .right {
-    display: none;
+  .workspace.right-open .right {
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(330px, 88vw);
+    z-index: 60;
+    box-shadow: -10px 0 30px #172b4d26;
   }
 }
