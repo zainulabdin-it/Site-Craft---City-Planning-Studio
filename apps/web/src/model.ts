@@ -409,6 +409,31 @@ export function demoProject() {
     "Neighbourhood market access",
     { width: 6, lanes: 1 },
   );
+  parkPlot("Market customer parking", -118, -62, -82, -26, "#505960");
+  add(
+    "road",
+    [
+      [-100, -7],
+      [-100, -26],
+    ],
+    "Market parking entrance",
+    { width: 6, lanes: 1 },
+  );
+  [
+    [-111, -37, "sedan", "#d94841"],
+    [-100, -37, "suv", "#2878c8"],
+    [-89, -37, "sedan", "#f2c94c"],
+    [-111, -52, "van", "#e8ecef"],
+    [-100, -52, "sedan", "#34a853"],
+    [-89, -52, "suv", "#7f56d9"],
+  ].forEach(([x, y, variant, color], index) =>
+    add("car", [[x as number, y as number]], `Market parked car ${index + 1}`, {
+      assetRef: `kenney:car:${variant}`,
+      rotation: 0,
+      scale: 0.9,
+      color: color as string,
+    }),
+  );
   add("building", [[66, -48]], "Mixed-use apartments", {
     width: 42,
     depth: 28,
@@ -424,6 +449,38 @@ export function demoProject() {
     ],
     "Apartment entrance road",
     { width: 7, lanes: 1 },
+  );
+  parkPlot("Apartment resident parking", 94, -66, 142, -30, "#505960");
+  add(
+    "road",
+    [
+      [118, -7],
+      [118, -30],
+    ],
+    "Apartment parking entrance",
+    { width: 7, lanes: 1 },
+  );
+  [
+    [102, -41, "sedan", "#f28c28"],
+    [114, -41, "suv", "#3057b8"],
+    [126, -41, "van", "#f4f5f7"],
+    [138, -41, "sedan", "#cf3f56"],
+    [102, -56, "suv", "#2ca06c"],
+    [114, -56, "sedan", "#f2c94c"],
+    [126, -56, "sedan", "#59636d"],
+    [138, -56, "suv", "#7f56d9"],
+  ].forEach(([x, y, variant, color], index) =>
+    add(
+      "car",
+      [[x as number, y as number]],
+      `Apartment parked car ${index + 1}`,
+      {
+        assetRef: `kenney:car:${variant}`,
+        rotation: 0,
+        scale: 0.9,
+        color: color as string,
+      },
+    ),
   );
 
   [

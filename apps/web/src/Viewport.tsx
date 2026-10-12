@@ -382,6 +382,31 @@ export function Viewport(props: Props) {
             width: o.kind === "boundary" ? 3 : 2,
             material: C.Color.fromCssColorString("#25b895"),
           };
+          if (o.kind === "plot" && o.name.toLowerCase().includes("parking")) {
+            const xs = o.points.map(([x]) => x),
+              ys = o.points.map(([, y]) => y),
+              minX = Math.min(...xs),
+              maxX = Math.max(...xs),
+              minY = Math.min(...ys),
+              maxY = Math.max(...ys),
+              columns = Math.max(2, Math.round((maxX - minX) / 6));
+            for (let bay = 1; bay < columns; bay++) {
+              const x = minX + ((maxX - minX) * bay) / columns;
+              v.entities.add({
+                id: `${o.id}:parking-bay-${bay}`,
+                polyline: {
+                  positions: [
+                    position([x, minY + 1], o.elevation + 0.34),
+                    position([x, maxY - 1], o.elevation + 0.34),
+                  ],
+                  width: 2,
+                  material: C.Color.WHITE.withAlpha(
+                    0.85 * props.opacity[o.kind],
+                  ),
+                },
+              });
+            }
+          }
         } else if (o.kind === "road") {
           e.polyline = {
             show: o.lanes > 1 || selected,

@@ -2650,6 +2650,494 @@
       "buildingType": "Detached house",
       "color": "#4b7863",
       "assetRef": ""
+    },
+    {
+      "id": "149b3261-f3aa-4171-af9f-451db2a2c138",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Market customer parking",
+      "points": [
+        [
+          -118,
+          -62
+        ],
+        [
+          -82,
+          -62
+        ],
+        [
+          -82,
+          -26
+        ],
+        [
+          -118,
+          -26
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#505960",
+      "assetRef": ""
+    },
+    {
+      "id": "a3127d33-0a8d-4cf9-ab29-b8a38fe778e4",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Market parking entrance",
+      "points": [
+        [
+          -100,
+          -7
+        ],
+        [
+          -100,
+          -26
+        ]
+      ],
+      "nodeIds": [
+        "30a77ea4-7bcf-48bc-a4c4-60a3c540ab0b",
+        "538760d4-9301-45a7-b0a7-4d3465ca6421"
+      ],
+      "width": 6,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "e3a182c1-cbdb-4a42-9b8d-589b303cac16",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market parked car 1",
+      "points": [
+        [
+          -111,
+          -37
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#d94841",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "fc812643-97c0-427e-99a5-a23a54dc31d4",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market parked car 2",
+      "points": [
+        [
+          -100,
+          -37
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#2878c8",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "eda86d8b-0988-490d-9503-14558cb4a786",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market parked car 3",
+      "points": [
+        [
+          -89,
+          -37
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f2c94c",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "d7e4a1ea-f0fa-4689-bf88-121c4a7bf3e8",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market parked car 4",
+      "points": [
+        [
+          -111,
+          -52
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#e8ecef",
+      "assetRef": "kenney:car:van"
+    },
+    {
+      "id": "60bcf0fc-8b1a-4a88-a854-93899a9b5d2e",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market parked car 5",
+      "points": [
+        [
+          -100,
+          -52
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#34a853",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "938b02ec-9400-4dc8-a11c-eb6acd7f0ea1",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market parked car 6",
+      "points": [
+        [
+          -89,
+          -52
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#7f56d9",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "25c43c79-dfc9-4fac-9daa-54b67e23d817",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Apartment resident parking",
+      "points": [
+        [
+          94,
+          -66
+        ],
+        [
+          142,
+          -66
+        ],
+        [
+          142,
+          -30
+        ],
+        [
+          94,
+          -30
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#505960",
+      "assetRef": ""
+    },
+    {
+      "id": "213f0044-f20b-4679-adf2-1284768ba277",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Apartment parking entrance",
+      "points": [
+        [
+          118,
+          -7
+        ],
+        [
+          118,
+          -30
+        ]
+      ],
+      "nodeIds": [
+        "9af776c6-a4e8-4f11-a00d-d13eee0656ab",
+        "559b13a3-11ef-4079-84e0-406e16fff34c"
+      ],
+      "width": 7,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 1,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "ecbab7aa-4097-4bcd-b562-cfba7a5a1487",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 1",
+      "points": [
+        [
+          102,
+          -41
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f28c28",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "5c6db8df-567e-4dc7-849f-1ea1a9a5a474",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 2",
+      "points": [
+        [
+          114,
+          -41
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#3057b8",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "7f6b4894-1649-41d6-b616-8173f799d459",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 3",
+      "points": [
+        [
+          126,
+          -41
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f4f5f7",
+      "assetRef": "kenney:car:van"
+    },
+    {
+      "id": "eaf4513c-a62c-4f74-9270-c8b80949ba0f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 4",
+      "points": [
+        [
+          138,
+          -41
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#cf3f56",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "1b628523-8128-42e6-9773-40ead014ded8",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 5",
+      "points": [
+        [
+          102,
+          -56
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#2ca06c",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "6eb8741d-2ed1-4b20-a6b8-7277a596d791",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 6",
+      "points": [
+        [
+          114,
+          -56
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f2c94c",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "09ea6ed0-3c3f-452b-bc1c-59346d983d72",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 7",
+      "points": [
+        [
+          126,
+          -56
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#59636d",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "6cdc363e-d0f2-46f3-b4ba-f6383d19237d",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Apartment parked car 8",
+      "points": [
+        [
+          138,
+          -56
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#7f56d9",
+      "assetRef": "kenney:car:suv"
     }
   ],
   "dataLayers": [],
