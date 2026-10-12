@@ -35,7 +35,7 @@ This document is the visual source of truth for future UI changes.
 - Every visible control must perform a real action or be removed.
 - Tool buttons use a consistent 48px hit area and clear active state.
 - Panel collapse controls sit in the panel header without covering its label.
-- 2D, 3D, fullscreen, compass, globe, and zoom controls stay inside the map area and above the imagery.
+- 2D, 3D, Street, fullscreen, compass, globe, and zoom controls stay inside the map area and above the imagery.
 - Coordinate, zoom, eye altitude, bearing, pitch, and diagnostics remain visible in the bottom status bar.
 
 ## Interaction

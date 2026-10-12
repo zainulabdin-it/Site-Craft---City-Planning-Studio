@@ -870,6 +870,7 @@ export default function App() {
               <button onClick={() => frame(undefined, "perspective")}>
                 3D
               </button>
+              <button onClick={() => frame(undefined, "street")}>Street</button>
             </div>
           </div>
           {toolsOpen ? (

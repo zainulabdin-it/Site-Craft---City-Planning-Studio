@@ -9,7 +9,14 @@ import {
 } from "./model";
 import { toGeo, toLocal, footprint, area, length } from "./geometry";
 export type ViewAction = {
-  type: "frame" | "top" | "perspective" | "location" | "zoom-in" | "zoom-out";
+  type:
+    | "frame"
+    | "top"
+    | "perspective"
+    | "street"
+    | "location"
+    | "zoom-in"
+    | "zoom-out";
   id?: string;
   location?: {
     center: Point;
@@ -68,6 +75,10 @@ export function Viewport(props: Props) {
     }
     viewer.current = v;
     v.scene.shadowMap.softShadows = true;
+    v.scene.backgroundColor = C.Color.fromCssColorString("#8dccf3");
+    v.scene.highDynamicRange = true;
+    v.scene.fog.enabled = true;
+    v.scene.fog.density = 0.00018;
     v.scene.globe.baseColor = C.Color.fromCssColorString("#e2e8dd");
     v.scene.globe.depthTestAgainstTerrain = false;
     const provider = new C.OpenStreetMapImageryProvider({
@@ -347,10 +358,10 @@ export function Viewport(props: Props) {
             o.kind === "boundary" ? 0 : 0.15,
             0,
             (o.kind === "boundary"
-              ? C.Color.fromCssColorString("#f7faf5")
+              ? C.Color.fromCssColorString("#eaf4dc")
               : color
             ).withAlpha(
-              (o.kind === "boundary" ? 0.86 : 0.42) * props.opacity[o.kind],
+              (o.kind === "boundary" ? 0.88 : 0.62) * props.opacity[o.kind],
             ),
           );
           e.polyline = {
@@ -365,7 +376,7 @@ export function Viewport(props: Props) {
             material: selected
               ? C.Color.fromCssColorString("#f8b84b")
               : new C.PolylineDashMaterialProperty({
-                  color: C.Color.fromCssColorString("#f3c94b").withAlpha(
+                  color: C.Color.WHITE.withAlpha(
                     props.opacity[o.kind],
                   ),
                   dashLength: 18,
@@ -383,9 +394,9 @@ export function Viewport(props: Props) {
                 : variant === "a"
                   ? "/assets/kenney/suburban/building-type-a.glb"
                   : "/assets/kenney/suburban/building-type-f.glb";
-          const houseScale = ((o.width + o.depth) / 4) * o.scale;
+          const houseScale = ((o.width + o.depth) / 4) * o.scale * 1.35;
           if (useHouseModel) {
-            e.position = position(o.points[0], o.elevation + houseScale);
+            e.position = position(o.points[0], o.elevation + 0.2);
             e.orientation = C.Transforms.headingPitchRollQuaternion(
               position(o.points[0]),
               new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
@@ -397,7 +408,7 @@ export function Viewport(props: Props) {
               selected,
               28,
               color,
-              0.68,
+              0.58,
             );
           } else {
             e.polygon = polygon(
@@ -488,8 +499,8 @@ export function Viewport(props: Props) {
             const palm = variant === "palm",
               columnar = variant === "columnar";
             if (!palm && !columnar) {
-              const treeScale = 4.8 * scale;
-              e.position = position(o.points[0], z + treeScale);
+              const treeScale = 6.2 * scale;
+              e.position = position(o.points[0], z + 0.15);
               e.model = model(
                 variant === "small"
                   ? "/assets/kenney/suburban/tree-small.glb"
@@ -498,6 +509,10 @@ export function Viewport(props: Props) {
                 props.opacity[o.kind],
                 selected,
                 20,
+                C.Color.fromCssColorString(
+                  variant === "small" ? "#75dc22" : "#4fcb21",
+                ),
+                0.64,
               );
             } else {
               e.ellipsoid = {
@@ -532,7 +547,7 @@ export function Viewport(props: Props) {
                     ? "/assets/kenney/cars/suv.glb"
                     : "/assets/kenney/cars/sedan.glb";
               const carScale = 2.25 * scale;
-              e.position = position(o.points[0], z + carScale);
+              e.position = position(o.points[0], z + 0.25);
               e.model = model(
                 carUri,
                 carScale,
@@ -540,7 +555,7 @@ export function Viewport(props: Props) {
                 selected,
                 18,
                 C.Color.fromCssColorString(o.color),
-                0.88,
+                0.68,
               );
             } else
               e.box = {
@@ -688,9 +703,7 @@ export function Viewport(props: Props) {
           o.id === props.selected
             ? new C.ColorMaterialProperty(C.Color.fromCssColorString("#f8b84b"))
             : new C.PolylineDashMaterialProperty({
-                color: C.Color.fromCssColorString("#f3c94b").withAlpha(
-                  props.opacity[o.kind],
-                ),
+                color: C.Color.WHITE.withAlpha(props.opacity[o.kind]),
                 dashLength: 18,
               });
     }
@@ -950,6 +963,34 @@ export function Viewport(props: Props) {
           center[1] + height / 2,
         );
       v.camera.flyTo({ destination: rectangle, duration: 1.1 });
+      return;
+    }
+    if (props.action.type === "street") {
+      const roads = props.project.objects.filter(
+          (object) => object.kind === "road" && object.points.length > 1,
+        ),
+        road =
+          roads.find((object) =>
+            object.name.toLowerCase().includes("garden"),
+          ) || roads[0],
+        start = road?.points[0] || ([0, -120] as Point),
+        end = road?.points[1] || ([0, 0] as Point),
+        direction: Point = [end[0] - start[0], end[1] - start[1]],
+        distance = Math.hypot(direction[0], direction[1]) || 1,
+        eye: Point = [
+          start[0] + (direction[0] / distance) * 6,
+          start[1] + (direction[1] / distance) * 6,
+        ],
+        ll = toGeo(eye, props.project.origin);
+      v.camera.flyTo({
+        destination: C.Cartesian3.fromDegrees(...ll, 3.2),
+        orientation: {
+          heading: Math.atan2(direction[0], direction[1]),
+          pitch: -0.04,
+          roll: 0,
+        },
+        duration: 0.8,
+      });
       return;
     }
     const o = props.project.objects.find((o) => o.id === props.action.id);

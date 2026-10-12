@@ -240,7 +240,7 @@ export function demoProject() {
   const homes: Array<[number, number, number, string]> = [
     ...homeXs.map(
       (x, index) =>
-        [x, 136, 180, ["a", "f", "k", "t"][index % 4]] as [
+        [x, 122, 180, ["a", "f", "k", "t"][index % 4]] as [
           number,
           number,
           number,
@@ -249,7 +249,7 @@ export function demoProject() {
     ),
     ...homeXs.map(
       (x, index) =>
-        [x, 58, 0, ["k", "f", "a", "t"][index % 4]] as [
+        [x, 70, 0, ["k", "f", "a", "t"][index % 4]] as [
           number,
           number,
           number,
@@ -273,14 +273,14 @@ export function demoProject() {
     depth: 24,
     floors: 2,
     buildingType: "Commercial",
-    color: "#b9c6d8",
+    color: "#f2c94c",
   });
   add("building", [[66, -48]], "Mixed-use apartments", {
     width: 42,
     depth: 28,
     floors: 5,
     buildingType: "Apartment",
-    color: "#c7b8a5",
+    color: "#e9b52f",
   });
 
   [
