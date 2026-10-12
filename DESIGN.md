@@ -40,6 +40,8 @@ This document is the visual source of truth for future UI changes.
 
 ## Interaction
 
+- Hand mode is a view-only mode: it clears editing handles and lets the user
+  orbit, tilt, pan, and zoom the 3D site without selecting or changing objects.
 - Move mode stays active until the user chooses Select or another tool.
 - Layer visibility, opacity, and order controls update the map immediately.
 - Search, save/open, drawing, selection, movement, undo, and redo must remain functional after layout changes.

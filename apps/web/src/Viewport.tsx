@@ -29,6 +29,7 @@ interface Props {
   onError: (s: string) => void;
   action: ViewAction;
   onContext: (s: string) => void;
+  navigationMode: boolean;
 }
 export function Viewport(props: Props) {
   const container = useRef<HTMLDivElement>(null),
@@ -144,6 +145,7 @@ export function Viewport(props: Props) {
       );
     };
     h.setInputAction((e: { position: C.Cartesian2 }) => {
+      if (latest.current.navigationMode) return;
       if (pickedIds(e.position).some((id) => id.startsWith("_handle:"))) return;
       const p = groundAt(e.position);
       if (p) latest.current.onClick(p, objectAt(e.position));
@@ -160,6 +162,7 @@ export function Viewport(props: Props) {
       | undefined;
     let hovered = "";
     h.setInputAction((e: { position: C.Cartesian2 }) => {
+      if (latest.current.navigationMode) return;
       const handleRaw = pickedIds(e.position).find((id) =>
         id.startsWith("_handle:"),
       );
@@ -187,6 +190,14 @@ export function Viewport(props: Props) {
       v.scene.screenSpaceCameraController.enableInputs = false;
     }, C.ScreenSpaceEventType.LEFT_DOWN);
     h.setInputAction((e: { endPosition: C.Cartesian2 }) => {
+      if (latest.current.navigationMode) {
+        if (hovered) {
+          hovered = "";
+          v.entities.removeById("_hover");
+          v.scene.requestRender();
+        }
+        return;
+      }
       if (drag) {
         drag.end = C.Cartesian2.clone(e.endPosition);
         return;
@@ -291,6 +302,7 @@ export function Viewport(props: Props) {
       selected: boolean,
       minimumPixelSize: number,
       tint = C.Color.WHITE,
+      tintAmount = 0.72,
     ) => ({
       uri,
       scale,
@@ -298,8 +310,8 @@ export function Viewport(props: Props) {
       maximumScale: scale * 2.4,
       color: tint.withAlpha(alpha),
       colorBlendMode: C.ColorBlendMode.MIX,
-      colorBlendAmount: tint.equals(C.Color.WHITE) ? 0 : 0.38,
-      imageBasedLightingFactor: new C.Cartesian2(1, 1),
+      colorBlendAmount: tint.equals(C.Color.WHITE) ? 0 : tintAmount,
+      imageBasedLightingFactor: new C.Cartesian2(1, 0.65),
       lightColor: C.Color.WHITE,
       silhouetteColor: selected
         ? C.Color.fromCssColorString("#f8b84b")
@@ -385,19 +397,8 @@ export function Viewport(props: Props) {
               selected,
               28,
               color,
+              0.68,
             );
-            v.entities.add({
-              id: `${o.id}:foundation`,
-              position: position(o.points[0], o.elevation + 0.12),
-              orientation: e.orientation as C.Quaternion,
-              box: {
-                dimensions: new C.Cartesian3(o.width, o.depth, 0.24),
-                material: C.Color.fromCssColorString("#d6d0c4").withAlpha(
-                  props.opacity[o.kind],
-                ),
-                shadows: C.ShadowMode.ENABLED,
-              },
-            });
           } else {
             e.polygon = polygon(
               footprint(o),
@@ -539,6 +540,7 @@ export function Viewport(props: Props) {
                 selected,
                 18,
                 C.Color.fromCssColorString(o.color),
+                0.88,
               );
             } else
               e.box = {
@@ -698,7 +700,7 @@ export function Viewport(props: Props) {
       if (typeof entity.id === "string" && entity.id.startsWith("_handle:"))
         v.entities.remove(entity);
     const selected = p.objects.find((o) => o.id === props.selected);
-    if (selected) {
+    if (selected && !props.navigationMode) {
       v.entities.add({
         id: "_selection",
         position: position(
@@ -770,6 +772,7 @@ export function Viewport(props: Props) {
     props.opacity,
     props.selected,
     props.draft,
+    props.navigationMode,
   ]);
   useEffect(() => {
     const v = viewer.current;
@@ -977,7 +980,7 @@ export function Viewport(props: Props) {
   }, [props.action]);
   return (
     <div
-      className="viewport"
+      className={`viewport${props.navigationMode ? " navigate" : ""}`}
       ref={container}
       aria-label="3D planning viewport"
     />

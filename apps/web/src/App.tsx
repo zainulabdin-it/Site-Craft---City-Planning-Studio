@@ -32,6 +32,7 @@ import {
   Circle,
   Square,
   Pencil,
+  Hand,
 } from "lucide-react";
 import {
   newProject,
@@ -100,7 +101,13 @@ export default function App() {
   const [project, setProject] = useState<Project>(boot.project),
     [selected, setSelected] = useState(""),
     [tool, setTool] = useState<
-      Kind | "select" | "move" | "rectangle" | "circle" | "freehand"
+      | Kind
+      | "select"
+      | "move"
+      | "hand"
+      | "rectangle"
+      | "circle"
+      | "freehand"
     >("select"),
     [draft, setDraft] = useState<Point[]>([]),
     [visible, setVisible] = useState(
@@ -227,6 +234,7 @@ export default function App() {
     }
   };
   const click = (p: Point, id?: string) => {
+    if (tool === "hand") return;
     if (tool === "select") {
       setSelected(project.objects.some((o) => o.id === id) ? id! : "");
       return;
@@ -807,6 +815,7 @@ export default function App() {
             onError={setError}
             onContext={setContext}
             action={action}
+            navigationMode={tool === "hand"}
           />
           <div className="map-top">
             <div className="map-actions">
@@ -875,6 +884,7 @@ export default function App() {
               {(
                 [
                   ["select", MousePointer2, "Select"],
+                  ["hand", Hand, "Hand · explore 360°"],
                   ["boundary", Pentagon, "Boundary"],
                   ["road", Route, "Road"],
                   ["building", Building2, "Building"],
@@ -897,6 +907,7 @@ export default function App() {
                     }
                     setTool(t);
                     setDraft([]);
+                    if (t === "hand") setSelected("");
                   }}
                 >
                   <Icon size={19} />
@@ -1009,7 +1020,7 @@ export default function App() {
               <Minus size={16} />
             </button>
           </div>
-          {tool !== "select" && (
+          {tool !== "select" && tool !== "hand" && (
             <div className="drawing-hint">
               <b>
                 {tool === "move"

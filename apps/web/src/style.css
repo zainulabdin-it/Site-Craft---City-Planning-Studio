@@ -524,6 +524,12 @@ main {
   position: absolute;
   inset: 0;
 }
+.viewport.navigate canvas {
+  cursor: grab;
+}
+.viewport.navigate canvas:active {
+  cursor: grabbing;
+}
 .map-top {
   position: absolute;
   top: 10px;

@@ -265,7 +265,7 @@ export function demoProject() {
       roof: "pitched",
       rotation,
       assetRef: `kenney:house:${variant}`,
-      color: ["#e6b8a2", "#b9d5e8", "#d9c5a0", "#c7d7df"][index % 4],
+      color: ["#ef8354", "#3f9ed8", "#f2c14e", "#55ad68"][index % 4],
     }),
   );
   add("building", [[-58, -42]], "Neighbourhood market", {
