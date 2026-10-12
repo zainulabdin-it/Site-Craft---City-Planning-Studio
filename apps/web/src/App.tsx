@@ -101,13 +101,7 @@ export default function App() {
   const [project, setProject] = useState<Project>(boot.project),
     [selected, setSelected] = useState(""),
     [tool, setTool] = useState<
-      | Kind
-      | "select"
-      | "move"
-      | "hand"
-      | "rectangle"
-      | "circle"
-      | "freehand"
+      Kind | "select" | "move" | "hand" | "rectangle" | "circle" | "freehand"
     >("select"),
     [draft, setDraft] = useState<Point[]>([]),
     [visible, setVisible] = useState(
@@ -134,10 +128,13 @@ export default function App() {
     [undo, setUndo] = useState<Command[]>([]),
     [redo, setRedo] = useState<Command[]>([]),
     [action, setAction] = useState<ViewAction>({ type: "frame", seq: 0 }),
-    [dialog, setDialog] = useState<"new" | "open" | null>(null),
+    [dialog, setDialog] = useState<"new" | "open" | "confirm-switch" | null>(
+      null,
+    ),
     [projects, setProjects] = useState<Project[]>([]),
+    [pendingProject, setPendingProject] = useState<Project | null>(null),
     [name, setName] = useState(""),
-    [storage, setStorage] = useState<"local" | "server">("local"),
+    [storage, setStorage] = useState<"local" | "server" | "computer">("local"),
     [locationQuery, setLocationQuery] = useState(""),
     [locationResults, setLocationResults] = useState<LocationResult[]>([]),
     [searching, setSearching] = useState(false);
@@ -335,7 +332,13 @@ export default function App() {
     const captured = version.current;
     setStatus("Saving…");
     try {
-      if (storage === "server") {
+      if (storage === "computer") {
+        const saved = await saveToComputer(project);
+        if (!saved) {
+          setStatus("Unsaved");
+          return false;
+        }
+      } else if (storage === "server") {
         const saved = await saveServer(project);
         if (version.current === captured) {
           setProject(saved);
@@ -348,12 +351,14 @@ export default function App() {
       } else saveLocal(project);
       setStatus(version.current === captured ? "Saved" : "Unsaved");
       setError("");
+      return true;
     } catch (e) {
       setStatus("Save failed");
       setError(String(e));
+      return false;
     }
   };
-  const switchProject = (p: Project) => {
+  const switchProject = (p: Project, saved = true) => {
     const validated = validateProject(p);
     setProject(validated);
     const nextVisible = Object.fromEntries(
@@ -370,9 +375,18 @@ export default function App() {
     setUndo([]);
     setRedo([]);
     cancel();
-    setStatus("Unsaved");
+    setStatus(saved ? "Saved" : "Unsaved");
     setDialog(null);
+    setPendingProject(null);
     frame();
+  };
+  const requestProjectSwitch = (next: Project, saved = true) => {
+    if (status === "Unsaved" && project.objects.length) {
+      setPendingProject(next);
+      setDialog("confirm-switch");
+      return;
+    }
+    switchProject(next, saved);
   };
   const updateDataLayer = (id: string, changes: Partial<DataLayer>) => {
     setProject((p) => ({
@@ -386,6 +400,10 @@ export default function App() {
   };
   const open = async () => {
     try {
+      if (storage === "computer") {
+        file.current?.click();
+        return;
+      }
       setProjects(storage === "server" ? await loadServer() : listLocal());
       setDialog("open");
     } catch (e) {
@@ -433,7 +451,7 @@ export default function App() {
         setLeftOpen(true);
         setLayersOpen(true);
         setError("");
-      } else switchProject(validateProject(parsed));
+      } else requestProjectSwitch(validateProject(parsed), true);
     } catch (err) {
       setError(String(err));
     }
@@ -564,7 +582,9 @@ export default function App() {
                 New
               </button>
               <button onClick={open}>Open project</button>
-              <button onClick={() => switchProject(demoProject())}>
+              <button
+                onClick={() => requestProjectSwitch(demoProject(), false)}
+              >
                 Open demo
               </button>
             </div>
@@ -573,11 +593,12 @@ export default function App() {
               <select
                 value={storage}
                 onChange={(e) =>
-                  setStorage(e.target.value as "local" | "server")
+                  setStorage(e.target.value as "local" | "server" | "computer")
                 }
               >
                 <option value="local">This browser</option>
                 <option value="server">Local API server</option>
+                <option value="computer">Computer file</option>
               </select>
             </label>
             <button
@@ -1152,7 +1173,10 @@ export default function App() {
               <button
                 onClick={async () => {
                   try {
-                    await saveToComputer(project);
+                    if (await saveToComputer(project)) {
+                      setStatus("Saved");
+                      setError("");
+                    }
                   } catch (e) {
                     setError(`Computer save failed: ${String(e)}`);
                   }
@@ -1199,12 +1223,44 @@ export default function App() {
         <div className="modal-backdrop">
           <section role="dialog" className="modal">
             <h2>
-              {dialog === "new" ? "Create a project" : "Open a saved project"}
+              {dialog === "new"
+                ? "Create a project"
+                : dialog === "confirm-switch"
+                  ? "Save current project?"
+                  : "Open a saved project"}
             </h2>
             <p className="muted">
-              Save your current work before switching projects.
+              {dialog === "confirm-switch"
+                ? pendingProject &&
+                  Math.abs(pendingProject.origin[0] - project.origin[0]) <
+                    0.0001 &&
+                  Math.abs(pendingProject.origin[1] - project.origin[1]) <
+                    0.0001
+                  ? "The loaded project uses this same site. Save your current work before replacing it."
+                  : "You have unsaved work. Save it before opening another project."
+                : "Projects retain their exact map origin, boundary and object positions."}
             </p>
-            {dialog === "new" ? (
+            {dialog === "confirm-switch" ? (
+              <>
+                <button
+                  className="primary"
+                  onClick={async () => {
+                    if (!pendingProject) return;
+                    const next = pendingProject;
+                    if (await save()) switchProject(next, true);
+                  }}
+                >
+                  Save current &amp; open
+                </button>
+                <button
+                  onClick={() => {
+                    if (pendingProject) switchProject(pendingProject, true);
+                  }}
+                >
+                  Open without saving
+                </button>
+              </>
+            ) : dialog === "new" ? (
               <>
                 <label className="field">
                   Project name
@@ -1218,7 +1274,9 @@ export default function App() {
                 <button
                   className="primary"
                   disabled={!name.trim()}
-                  onClick={() => switchProject(newProject(name.trim()))}
+                  onClick={() =>
+                    requestProjectSwitch(newProject(name.trim()), false)
+                  }
                 >
                   Create project
                 </button>
@@ -1227,19 +1285,28 @@ export default function App() {
               <>
                 <div className="saved-projects">
                   {projects.map((p) => (
-                    <button key={p.id} onClick={() => switchProject(p)}>
+                    <button key={p.id} onClick={() => requestProjectSwitch(p)}>
                       {p.name}
                       <small>{p.objects.length} objects</small>
                     </button>
                   ))}
                 </div>
                 {!projects.length && <p>No saved projects here yet.</p>}
-                <button onClick={() => switchProject(demoProject())}>
+                <button
+                  onClick={() => requestProjectSwitch(demoProject(), false)}
+                >
                   Load labelled demo proposal
                 </button>
               </>
             )}
-            <button onClick={() => setDialog(null)}>Cancel</button>
+            <button
+              onClick={() => {
+                setPendingProject(null);
+                setDialog(null);
+              }}
+            >
+              Cancel
+            </button>
           </section>
         </div>
       )}

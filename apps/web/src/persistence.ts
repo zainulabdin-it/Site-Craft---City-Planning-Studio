@@ -81,7 +81,7 @@ interface ProjectFileHandle {
   createWritable(): Promise<WritableProjectFile>;
 }
 
-export async function saveToComputer(p: Project) {
+export async function saveToComputer(p: Project): Promise<boolean> {
   const filename = `${p.name.replace(/[^a-z0-9]/gi, "-")}.json`,
     picker = (
       window as typeof window & {
@@ -90,7 +90,7 @@ export async function saveToComputer(p: Project) {
     ).showSaveFilePicker;
   if (!picker) {
     download(p);
-    return;
+    return true;
   }
   try {
     const handle = await picker({
@@ -105,8 +105,10 @@ export async function saveToComputer(p: Project) {
       writable = await handle.createWritable();
     await writable.write(JSON.stringify(p, null, 2));
     await writable.close();
+    return true;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return;
+    if (error instanceof DOMException && error.name === "AbortError")
+      return false;
     throw error;
   }
 }
