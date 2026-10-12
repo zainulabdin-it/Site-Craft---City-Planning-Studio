@@ -317,18 +317,6 @@ export function demoProject() {
       scale,
     }),
   );
-  add(
-    "plot",
-    [
-      [-225, -116],
-      [225, -116],
-      [225, -84],
-      [-225, -84],
-    ],
-    "Avon water and landscape corridor",
-    { color: "#4c9bd6" },
-  );
-
   const homeXs = [-198, -158, -118, -78, -38, 38, 78, 118, 158, 198];
   const homes: Array<[number, number, number, string]> = [
     ...homeXs.map(
