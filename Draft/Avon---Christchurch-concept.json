@@ -1,0 +1,2090 @@
+{
+  "schemaVersion": 2,
+  "id": "87b3a96c-4ce7-4688-b191-9b7ca039e5f0",
+  "name": "Avon / Christchurch concept",
+  "revision": 0,
+  "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+  "scenarioName": "Base proposal",
+  "origin": [
+    172.6362,
+    -43.5321
+  ],
+  "horizontalCRS": "EPSG:2193",
+  "verticalReference": "Conceptual offset above ellipsoid; not NZVD2016",
+  "objects": [
+    {
+      "id": "0bdfc223-ffcc-4f51-be4f-870f69ae972b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "boundary",
+      "name": "Riverside neighbourhood · 16.1 ha",
+      "points": [
+        [
+          -230,
+          -175
+        ],
+        [
+          230,
+          -175
+        ],
+        [
+          230,
+          175
+        ],
+        [
+          -230,
+          175
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "a9a017dd-03c7-4a4e-977f-7afd6701f330",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Riverside Avenue",
+      "points": [
+        [
+          -220,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          220,
+          0
+        ]
+      ],
+      "nodeIds": [
+        "737d5114-3226-45df-9a18-a5d1a2f1b268",
+        "72875373-10d6-40bb-a657-7fd56fb42cf4",
+        "dbc0a8c4-d552-4878-8209-3196f48672e6"
+      ],
+      "width": 14,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 4,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "1d801297-90f5-42f9-b8c6-996f642c5630",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Market Street",
+      "points": [
+        [
+          0,
+          -165
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          165
+        ]
+      ],
+      "nodeIds": [
+        "6337557f-f707-4311-b030-16ed7f452072",
+        "72875373-10d6-40bb-a657-7fd56fb42cf4",
+        "11475d29-19ab-41a3-bce6-8901a0514e2a"
+      ],
+      "width": 10,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "e7e49303-100b-4824-ba33-f7b4e756c137",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "road",
+      "name": "Garden Lane",
+      "points": [
+        [
+          -205,
+          96
+        ],
+        [
+          0,
+          96
+        ],
+        [
+          205,
+          96
+        ]
+      ],
+      "nodeIds": [
+        "cb903c24-d7e3-421c-a4cc-fb9f76de0f7b",
+        "d6630175-328d-40d4-81a7-ee83409f709d",
+        "1bd3fdc7-02a9-4ac1-a863-6f376deb5c51"
+      ],
+      "width": 8,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": ""
+    },
+    {
+      "id": "300af73b-cfbd-4a17-a6a7-f0877807cc4b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Riverside community park",
+      "points": [
+        [
+          -215,
+          18
+        ],
+        [
+          -20,
+          18
+        ],
+        [
+          -20,
+          82
+        ],
+        [
+          -215,
+          82
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#5aa66f",
+      "assetRef": ""
+    },
+    {
+      "id": "a831ca1b-4240-49e7-8fb5-8ef917bb0ce3",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Park entrance plaza",
+      "points": [
+        [
+          -132,
+          18
+        ],
+        [
+          -104,
+          18
+        ],
+        [
+          -104,
+          34
+        ],
+        [
+          -132,
+          34
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#d8d2c4",
+      "assetRef": ""
+    },
+    {
+      "id": "5e790942-bac2-43b3-9715-a76851d78c2d",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Main walking promenade",
+      "points": [
+        [
+          -123,
+          30
+        ],
+        [
+          -113,
+          30
+        ],
+        [
+          -113,
+          78
+        ],
+        [
+          -123,
+          78
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#ddd8ca",
+      "assetRef": ""
+    },
+    {
+      "id": "fa4211f3-89aa-4403-977e-e7a4632a4ae8",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Garden walking path",
+      "points": [
+        [
+          -205,
+          47
+        ],
+        [
+          -30,
+          47
+        ],
+        [
+          -30,
+          55
+        ],
+        [
+          -205,
+          55
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#d8d2c4",
+      "assetRef": ""
+    },
+    {
+      "id": "bc4987ae-e934-4a54-b6ab-9a07df8ecb1f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Visitor parking",
+      "points": [
+        [
+          -72,
+          22
+        ],
+        [
+          -28,
+          22
+        ],
+        [
+          -28,
+          43
+        ],
+        [
+          -72,
+          43
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#58626b",
+      "assetRef": ""
+    },
+    {
+      "id": "39238ab0-4487-400f-b9eb-c21af1557979",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Children playground",
+      "points": [
+        [
+          -102,
+          58
+        ],
+        [
+          -67,
+          58
+        ],
+        [
+          -67,
+          77
+        ],
+        [
+          -102,
+          77
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#e9b96e",
+      "assetRef": ""
+    },
+    {
+      "id": "d04b6679-f8b0-490f-bf60-3185d16de38e",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Riverside park pond",
+      "points": [
+        [
+          -192,
+          58
+        ],
+        [
+          -157,
+          58
+        ],
+        [
+          -157,
+          77
+        ],
+        [
+          -192,
+          77
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#3a9bd4",
+      "assetRef": ""
+    },
+    {
+      "id": "b13b6c7e-5b3e-4247-86f1-5493724c04ba",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Flower garden",
+      "points": [
+        [
+          -150,
+          59
+        ],
+        [
+          -130,
+          59
+        ],
+        [
+          -130,
+          77
+        ],
+        [
+          -150,
+          77
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0.12,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#d96f9f",
+      "assetRef": ""
+    },
+    {
+      "id": "7088ceaa-1659-495d-8475-c6282a2f9144",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Park pavilion",
+      "points": [
+        [
+          -42,
+          65
+        ]
+      ],
+      "nodeIds": [],
+      "width": 20,
+      "depth": 12,
+      "floors": 1,
+      "floorHeight": 3.2,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Commercial",
+      "color": "#f2c14e",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "c3a20095-204d-4ee2-ba28-7c53907d049a",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Parked car 1",
+      "points": [
+        [
+          -66,
+          28
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#d94841",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "a53ebf3c-b46c-4c50-bc3f-04bc76359968",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Parked car 2",
+      "points": [
+        [
+          -56,
+          28
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#2878c8",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "6311d6ee-3a39-49ac-abfc-da35d3a27e6c",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Parked car 3",
+      "points": [
+        [
+          -46,
+          28
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f2c94c",
+      "assetRef": "kenney:car:van"
+    },
+    {
+      "id": "f6f50c71-c238-4237-a67e-dc9209484f0d",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Parked car 4",
+      "points": [
+        [
+          -36,
+          28
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#34a853",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "d704e396-c80f-4c0b-889a-79b1bed8f6cf",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench 1",
+      "points": [
+        [
+          -142,
+          42
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:modern"
+    },
+    {
+      "id": "b9462b0f-7946-491a-a8ec-aa4efea34c0f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench 2",
+      "points": [
+        [
+          -94,
+          42
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:timber"
+    },
+    {
+      "id": "df06a794-3f19-4014-afcd-85f9f9171f1e",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench 3",
+      "points": [
+        [
+          -142,
+          59
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:timber"
+    },
+    {
+      "id": "585b5bc8-b4b0-4135-937e-044a29e56321",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench 4",
+      "points": [
+        [
+          -94,
+          59
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:modern"
+    },
+    {
+      "id": "5451d629-35db-4771-b17d-991c100c22a5",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench 5",
+      "points": [
+        [
+          -181,
+          54
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:timber"
+    },
+    {
+      "id": "2ac9effd-e3cf-4ae5-82a4-a45dba6825bb",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench 6",
+      "points": [
+        [
+          -166,
+          54
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:timber"
+    },
+    {
+      "id": "389ba129-82ad-4a71-a1a1-6384622d7a62",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 1",
+      "points": [
+        [
+          -207,
+          27
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1.1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "e8272bec-9c3e-486d-88f3-d62bebcd920d",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 2",
+      "points": [
+        [
+          -194,
+          35
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.85,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "de52573f-3c55-4c4d-98f0-453284d67c3c",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 3",
+      "points": [
+        [
+          -180,
+          29
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "d264fd1d-2404-4ba9-bc68-2bb858c0771b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 4",
+      "points": [
+        [
+          -165,
+          39
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:tree:columnar"
+    },
+    {
+      "id": "b2e34a98-affc-402c-8eaf-3c13c71bebd4",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 5",
+      "points": [
+        [
+          -150,
+          29
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1.05,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "96bdab20-0073-4057-a22a-0c9bbeb76ea5",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 6",
+      "points": [
+        [
+          -91,
+          29
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.8,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "330acfe3-5774-432a-8f50-67ce66738ce2",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 7",
+      "points": [
+        [
+          -82,
+          42
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:tree:columnar"
+    },
+    {
+      "id": "315be291-584c-4cee-910d-8afc4f1fcdc9",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 8",
+      "points": [
+        [
+          -205,
+          67
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1.1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "7571552c-91b2-449e-aefb-66bde0e153ab",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 9",
+      "points": [
+        [
+          -198,
+          78
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.85,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "8b1687fe-ff1c-4d1f-aa46-cfe06c6c44ff",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 10",
+      "points": [
+        [
+          -147,
+          80
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "85a6403b-5e60-40f2-b1ef-cff4d0197290",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 11",
+      "points": [
+        [
+          -128,
+          69
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:tree:columnar"
+    },
+    {
+      "id": "a6c2fb14-8f7f-4d70-a04e-821e1269d040",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 12",
+      "points": [
+        [
+          -110,
+          79
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.85,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "1037bf6f-1ff2-46e5-9758-2460216d1eb6",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 13",
+      "points": [
+        [
+          -87,
+          80
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1.05,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "472823ec-969b-4ef0-b64a-2fb3073d2c4a",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 14",
+      "points": [
+        [
+          -62,
+          51
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.9,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:tree:columnar"
+    },
+    {
+      "id": "cebd9b9a-9beb-4c7e-a7b5-d607844d7c14",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 15",
+      "points": [
+        [
+          -29,
+          50
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "7404e7c7-cdd4-4324-ac8e-b68914db97cf",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Park tree 16",
+      "points": [
+        [
+          -27,
+          77
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.85,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "28f2be7f-3d19-4ac6-adb8-f376ff88a77f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "plot",
+      "name": "Avon water and landscape corridor",
+      "points": [
+        [
+          -225,
+          -116
+        ],
+        [
+          225,
+          -116
+        ],
+        [
+          225,
+          -84
+        ],
+        [
+          -225,
+          -84
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4c9bd6",
+      "assetRef": ""
+    },
+    {
+      "id": "1b7234f8-cb97-421e-a8f4-12ea97f290bf",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 1",
+      "points": [
+        [
+          -198,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#ef8354",
+      "assetRef": "kenney:house:a"
+    },
+    {
+      "id": "5c7e335d-38e9-4ba4-b132-223bac54e32b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 2",
+      "points": [
+        [
+          -158,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#3f9ed8",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "bf4fcc32-eba1-42b6-83ab-980049a5bde5",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 3",
+      "points": [
+        [
+          -118,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#f2c14e",
+      "assetRef": "kenney:house:k"
+    },
+    {
+      "id": "d0f4dcc9-f475-4073-910d-2f067247c333",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 4",
+      "points": [
+        [
+          -78,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 19,
+      "depth": 13,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#55ad68",
+      "assetRef": "kenney:house:t"
+    },
+    {
+      "id": "a362ae65-1eb2-4562-afe6-ea5b01fbed75",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 5",
+      "points": [
+        [
+          -38,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#ef8354",
+      "assetRef": "kenney:house:a"
+    },
+    {
+      "id": "59008904-54d5-4f2a-9b51-3c75e0e1043e",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 6",
+      "points": [
+        [
+          38,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#3f9ed8",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "4139068e-4642-447b-9ed5-ca7c3ef9a02f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 7",
+      "points": [
+        [
+          78,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#f2c14e",
+      "assetRef": "kenney:house:k"
+    },
+    {
+      "id": "f153962f-d2c2-4003-8ba4-04003b47660b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 8",
+      "points": [
+        [
+          118,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 19,
+      "depth": 13,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#55ad68",
+      "assetRef": "kenney:house:t"
+    },
+    {
+      "id": "0b56b8d9-9823-4142-91c3-9b03636696ba",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 9",
+      "points": [
+        [
+          158,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#ef8354",
+      "assetRef": "kenney:house:a"
+    },
+    {
+      "id": "cfbfe868-0461-4381-9f23-bd3aef1c9bd9",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 10",
+      "points": [
+        [
+          198,
+          122
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 180,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#3f9ed8",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "326671b3-74ee-4c4e-832a-5032f1a00111",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 11",
+      "points": [
+        [
+          38,
+          70
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#f2c14e",
+      "assetRef": "kenney:house:k"
+    },
+    {
+      "id": "63411f59-2ecb-49c2-b006-5811ff5a39cc",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 12",
+      "points": [
+        [
+          78,
+          70
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#55ad68",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "2fd4ffc3-453f-4f49-a6aa-98ae74e7613f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 13",
+      "points": [
+        [
+          118,
+          70
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#ef8354",
+      "assetRef": "kenney:house:a"
+    },
+    {
+      "id": "eb2c1272-74ea-4bef-9e39-f0ba975a5054",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 14",
+      "points": [
+        [
+          158,
+          70
+        ]
+      ],
+      "nodeIds": [],
+      "width": 19,
+      "depth": 13,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#3f9ed8",
+      "assetRef": "kenney:house:t"
+    },
+    {
+      "id": "32ad9b23-f3e5-453b-b915-a084d61b183b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Garden Lane home 15",
+      "points": [
+        [
+          198,
+          70
+        ]
+      ],
+      "nodeIds": [],
+      "width": 16,
+      "depth": 12,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "pitched",
+      "buildingType": "Detached house",
+      "color": "#f2c14e",
+      "assetRef": "kenney:house:k"
+    },
+    {
+      "id": "369d11cc-485e-439d-aed8-914d521a7954",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Neighbourhood market",
+      "points": [
+        [
+          -58,
+          -42
+        ]
+      ],
+      "nodeIds": [],
+      "width": 36,
+      "depth": 24,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Commercial",
+      "color": "#f2c94c",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "96f1e10d-49b7-4f11-995e-0535a69d211a",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "building",
+      "name": "Mixed-use apartments",
+      "points": [
+        [
+          66,
+          -48
+        ]
+      ],
+      "nodeIds": [],
+      "width": 42,
+      "depth": 28,
+      "floors": 5,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Apartment",
+      "color": "#e9b52f",
+      "assetRef": "kenney:house:f"
+    },
+    {
+      "id": "7d610905-3b4e-4c65-8b28-2bc2f33e0d99",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 1",
+      "points": [
+        [
+          108,
+          34
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.8,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "16c36f48-1e29-42cf-9176-7bcbdd63743c",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 2",
+      "points": [
+        [
+          154,
+          36
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "e9c6df60-c467-4e34-99f0-7b8eb733ca4f",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 3",
+      "points": [
+        [
+          204,
+          52
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "e6a08f95-0db9-4709-886c-5e2821d4921e",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 4",
+      "points": [
+        [
+          -210,
+          118
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.8,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "c25d0246-1a64-4fca-aed7-56b949f7c761",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 5",
+      "points": [
+        [
+          -178,
+          110
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "f213c99e-f121-4d05-8076-fe7b27a882b3",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 6",
+      "points": [
+        [
+          -142,
+          112
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "b426031e-b401-4150-a10d-5a8ec639836c",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 7",
+      "points": [
+        [
+          142,
+          112
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 0.8,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:small"
+    },
+    {
+      "id": "d2115885-5801-4974-ba74-25cff2784d4b",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 8",
+      "points": [
+        [
+          178,
+          110
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "ff89d134-bceb-4a35-93a1-69924fcc78c8",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "tree",
+      "name": "Street tree 9",
+      "points": [
+        [
+          210,
+          118
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "kenney:tree:large"
+    },
+    {
+      "id": "cabd8195-5a9d-4abe-b813-a6d9fa0cfed9",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench west",
+      "points": [
+        [
+          -150,
+          34
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:timber"
+    },
+    {
+      "id": "e0d7ef13-aeb7-4016-829c-ff2defcef2a7",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bench",
+      "name": "Park bench east",
+      "points": [
+        [
+          -82,
+          34
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#4b7863",
+      "assetRef": "builtin:bench:modern"
+    },
+    {
+      "id": "ea746e55-79e9-4ec5-8c60-a95752362ebe",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Westbound sedan",
+      "points": [
+        [
+          -92,
+          -4
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#d94841",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "8d099ed4-661e-404c-b307-a35b01cb37bc",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Eastbound SUV",
+      "points": [
+        [
+          118,
+          4
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": -90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#2878c8",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "a1f02271-e55f-412e-a418-fc0bfa3af762",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Market delivery van",
+      "points": [
+        [
+          5,
+          48
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f2c94c",
+      "assetRef": "kenney:car:van"
+    },
+    {
+      "id": "fc147804-e2af-4948-bd0d-d96846fc457d",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Eastbound compact",
+      "points": [
+        [
+          -176,
+          4
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": -90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#34a853",
+      "assetRef": "kenney:car:sedan"
+    },
+    {
+      "id": "134cdf42-7da8-4d23-8645-e8f2a34c03a1",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Westbound van",
+      "points": [
+        [
+          176,
+          -4
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 90,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#f28c28",
+      "assetRef": "kenney:car:van"
+    },
+    {
+      "id": "c3b5f33c-c972-4665-9304-f55d3b6fdf31",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "car",
+      "name": "Garden Lane SUV",
+      "points": [
+        [
+          -5,
+          118
+        ]
+      ],
+      "nodeIds": [],
+      "width": 12,
+      "depth": 16,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 0,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#7f56d9",
+      "assetRef": "kenney:car:suv"
+    },
+    {
+      "id": "b5185de9-bb5e-4bc9-9ddd-7a1a9ca6f9cd",
+      "scenarioId": "d9fb629e-c4bc-47f6-b435-0cf1bfc0c661",
+      "kind": "bridge",
+      "name": "Avon crossing",
+      "points": [
+        [
+          0,
+          -100
+        ]
+      ],
+      "nodeIds": [],
+      "width": 13,
+      "depth": 36,
+      "floors": 2,
+      "floorHeight": 3,
+      "rotation": 0,
+      "scale": 1,
+      "elevation": 1.2,
+      "lanes": 2,
+      "roof": "flat",
+      "buildingType": "Detached house",
+      "color": "#697782",
+      "assetRef": "builtin:bridge:arch"
+    }
+  ],
+  "dataLayers": [],
+  "designLayers": [
+    {
+      "kind": "boundary",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "road",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "building",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "plot",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "tree",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "car",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "bench",
+      "visible": true,
+      "opacity": 1
+    },
+    {
+      "kind": "bridge",
+      "visible": true,
+      "opacity": 1
+    }
+  ]
+}
