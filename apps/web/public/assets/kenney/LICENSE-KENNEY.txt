@@ -1,6 +1,7 @@
 	
 
 	City Kit Suburban (2.0)
+	Car Kit
 
 	Created/distributed by Kenney (www.kenney.nl)
 	Creation date: 23-04-2025 20:22
@@ -17,6 +18,8 @@
 			------------------------------
 
 	• Website : www.kenney.nl
+	• Sources : https://kenney.nl/assets/city-kit-suburban
+	            https://kenney.nl/assets/car-kit
 	• Donate  : www.kenney.nl/donate
 
 	• Patreon : patreon.com/kenney

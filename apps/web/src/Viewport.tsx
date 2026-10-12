@@ -250,7 +250,8 @@ export function Viewport(props: Props) {
           outlineWidth: 2,
           style: C.LabelStyle.FILL_AND_OUTLINE,
           showBackground: true,
-          backgroundColor: C.Color.fromCssColorString("#172554").withAlpha(0.94),
+          backgroundColor:
+            C.Color.fromCssColorString("#172554").withAlpha(0.94),
           backgroundPadding: new C.Cartesian2(10, 8),
           pixelOffset: new C.Cartesian2(0, -24),
           verticalOrigin: C.VerticalOrigin.BOTTOM,
@@ -353,6 +354,11 @@ export function Viewport(props: Props) {
           name: o.name,
         };
         if (o.kind === "boundary" || o.kind === "plot") {
+          const water =
+            o.kind === "plot" &&
+            (o.name.toLowerCase().includes("water") ||
+              o.name.toLowerCase().includes("river") ||
+              o.name.toLowerCase().includes("canal"));
           e.polygon = polygon(
             o.points,
             o.kind === "boundary" ? 0 : 0.15,
@@ -364,6 +370,13 @@ export function Viewport(props: Props) {
               (o.kind === "boundary" ? 0.88 : 0.62) * props.opacity[o.kind],
             ),
           );
+          if (water)
+            (e.polygon as C.Entity.ConstructorOptions["polygon"])!.material =
+              new C.ImageMaterialProperty({
+                image: "/assets/textures/water-surface.svg",
+                repeat: new C.Cartesian2(8, 3),
+                color: C.Color.WHITE.withAlpha(0.88 * props.opacity[o.kind]),
+              });
           e.polyline = {
             positions: [...o.points, o.points[0]].map((q) => position(q, 0.3)),
             width: o.kind === "boundary" ? 3 : 2,
@@ -376,9 +389,7 @@ export function Viewport(props: Props) {
             material: selected
               ? C.Color.fromCssColorString("#f8b84b")
               : new C.PolylineDashMaterialProperty({
-                  color: C.Color.WHITE.withAlpha(
-                    props.opacity[o.kind],
-                  ),
+                  color: C.Color.WHITE.withAlpha(props.opacity[o.kind]),
                   dashLength: 18,
                 }),
           };
@@ -512,7 +523,7 @@ export function Viewport(props: Props) {
                 C.Color.fromCssColorString(
                   variant === "small" ? "#75dc22" : "#4fcb21",
                 ),
-                0.64,
+                0.1,
               );
             } else {
               e.ellipsoid = {
@@ -555,7 +566,7 @@ export function Viewport(props: Props) {
                 selected,
                 18,
                 C.Color.fromCssColorString(o.color),
-                0.68,
+                0.28,
               );
             } else
               e.box = {
@@ -571,6 +582,42 @@ export function Viewport(props: Props) {
                 ).withAlpha(props.opacity[o.kind]),
               };
             if (o.kind === "bench") {
+              const wood =
+                variant === "stone"
+                  ? ["#b7b0a7", "#97918a", "#c9c3bb"]
+                  : variant === "modern"
+                    ? ["#66727c", "#414b54", "#7b8791"]
+                    : ["#a96f3f", "#7d4c2d", "#c58a55"];
+              for (let slat = -1; slat <= 1; slat++)
+                v.entities.add({
+                  id: `${o.id}:seat-slat-${slat}`,
+                  position: position(
+                    [
+                      o.points[0][0] -
+                        Math.sin((o.rotation * Math.PI) / 180) *
+                          slat *
+                          0.19 *
+                          scale,
+                      o.points[0][1] +
+                        Math.cos((o.rotation * Math.PI) / 180) *
+                          slat *
+                          0.19 *
+                          scale,
+                    ],
+                    z + 1.12 * scale,
+                  ),
+                  orientation: e.orientation as C.Quaternion,
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      (variant === "modern" ? 2.7 : 2.1) * scale,
+                      0.15 * scale,
+                      0.1 * scale,
+                    ),
+                    material: C.Color.fromCssColorString(
+                      wood[slat + 1],
+                    ).withAlpha(props.opacity[o.kind]),
+                  },
+                });
               for (const side of [-0.7, 0.7])
                 v.entities.add({
                   id: `${o.id}:leg-${side}`,
@@ -595,25 +642,25 @@ export function Viewport(props: Props) {
                     ),
                   },
                 });
-              v.entities.add({
-                id: `${o.id}:back`,
-                position: position(o.points[0], z + 1.35 * scale),
-                orientation: e.orientation as C.Quaternion,
-                box: {
-                  dimensions: new C.Cartesian3(
-                    (variant === "modern" ? 2.7 : 2.1) * scale,
-                    (variant === "stone" ? 0.4 : 0.22) * scale,
-                    (variant === "stone" ? 0.65 : 1) * scale,
+              for (let slat = 0; slat < 3; slat++)
+                v.entities.add({
+                  id: `${o.id}:back-slat-${slat}`,
+                  position: position(
+                    o.points[0],
+                    z + (1.32 + slat * 0.28) * scale,
                   ),
-                  material: C.Color.fromCssColorString(
-                    variant === "stone"
-                      ? "#a8a29e"
-                      : variant === "modern"
-                        ? "#4b5563"
-                        : "#8b5e3c",
-                  ).withAlpha(props.opacity[o.kind]),
-                },
-              });
+                  orientation: e.orientation as C.Quaternion,
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      (variant === "modern" ? 2.7 : 2.1) * scale,
+                      (variant === "stone" ? 0.3 : 0.14) * scale,
+                      0.18 * scale,
+                    ),
+                    material: C.Color.fromCssColorString(wood[slat]).withAlpha(
+                      props.opacity[o.kind],
+                    ),
+                  },
+                });
             } else if (o.kind === "bridge") {
               const angle = (o.rotation * Math.PI) / 180;
               const localPoint = (across: number, along: number): Point => [
@@ -624,7 +671,8 @@ export function Viewport(props: Props) {
                   Math.sin(angle) * across +
                   Math.cos(angle) * along,
               ];
-              for (const side of [-1, 1])
+              const steel = variant === "pedestrian" ? "#d76831" : "#475569";
+              for (const side of [-1, 1]) {
                 v.entities.add({
                   id: `${o.id}:rail-${side}`,
                   position: position(
@@ -636,13 +684,51 @@ export function Viewport(props: Props) {
                     dimensions: new C.Cartesian3(
                       (variant === "pedestrian" ? 0.12 : 0.18) * scale,
                       o.depth * scale,
-                      1.2 * scale,
+                      0.14 * scale,
                     ),
-                    material: C.Color.fromCssColorString("#6b7280").withAlpha(
+                    material: C.Color.fromCssColorString(steel).withAlpha(
                       props.opacity[o.kind],
                     ),
                   },
                 });
+                for (let post = -4; post <= 4; post++)
+                  v.entities.add({
+                    id: `${o.id}:rail-post-${side}-${post}`,
+                    position: position(
+                      localPoint(
+                        (side * (o.width * scale - 0.4)) / 2,
+                        (post / 9) * o.depth * scale,
+                      ),
+                      z + 0.9 * scale,
+                    ),
+                    orientation: e.orientation as C.Quaternion,
+                    box: {
+                      dimensions: new C.Cartesian3(
+                        0.16 * scale,
+                        0.16 * scale,
+                        1.15 * scale,
+                      ),
+                      material: C.Color.fromCssColorString(steel).withAlpha(
+                        props.opacity[o.kind],
+                      ),
+                    },
+                  });
+              }
+              v.entities.add({
+                id: `${o.id}:center-line`,
+                position: position(o.points[0], z + 0.43 * scale),
+                orientation: e.orientation as C.Quaternion,
+                box: {
+                  dimensions: new C.Cartesian3(
+                    0.12 * scale,
+                    o.depth * 0.92 * scale,
+                    0.04 * scale,
+                  ),
+                  material: C.Color.fromCssColorString("#f4c542").withAlpha(
+                    props.opacity[o.kind],
+                  ),
+                },
+              });
               for (const along of [-0.32, 0.32])
                 v.entities.add({
                   id: `${o.id}:pier-${along}`,
