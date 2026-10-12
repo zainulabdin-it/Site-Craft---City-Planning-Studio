@@ -224,6 +224,99 @@ export function demoProject() {
     "Riverside community park",
     { color: "#5aa66f" },
   );
+  const parkPlot = (
+    name: string,
+    west: number,
+    south: number,
+    east: number,
+    north: number,
+    color: string,
+  ) =>
+    add(
+      "plot",
+      [
+        [west, south],
+        [east, south],
+        [east, north],
+        [west, north],
+      ],
+      name,
+      { color, elevation: 0.12 },
+    );
+
+  parkPlot("Park entrance plaza", -132, 18, -104, 34, "#d8d2c4");
+  parkPlot("Main walking promenade", -123, 30, -113, 78, "#ddd8ca");
+  parkPlot("Garden walking path", -205, 47, -30, 55, "#d8d2c4");
+  parkPlot("Visitor parking", -72, 22, -28, 43, "#58626b");
+  parkPlot("Children playground", -102, 58, -67, 77, "#e9b96e");
+  parkPlot("Riverside park pond", -192, 58, -157, 77, "#3a9bd4");
+  parkPlot("Flower garden", -150, 59, -130, 77, "#d96f9f");
+
+  add("building", [[-42, 65]], "Park pavilion", {
+    width: 20,
+    depth: 12,
+    floors: 1,
+    floorHeight: 3.2,
+    buildingType: "Commercial",
+    roof: "pitched",
+    color: "#f2c14e",
+  });
+
+  [
+    [-66, 28, "sedan", "#d94841"],
+    [-56, 28, "suv", "#2878c8"],
+    [-46, 28, "van", "#f2c94c"],
+    [-36, 28, "sedan", "#34a853"],
+  ].forEach(([x, y, variant, color], index) =>
+    add("car", [[x as number, y as number]], `Parked car ${index + 1}`, {
+      assetRef: `kenney:car:${variant}`,
+      rotation: 0,
+      scale: 0.9,
+      color: color as string,
+    }),
+  );
+
+  [
+    [-142, 42, 0],
+    [-94, 42, 0],
+    [-142, 59, 180],
+    [-94, 59, 180],
+    [-181, 54, 90],
+    [-166, 54, 90],
+  ].forEach(([x, y, rotation], index) =>
+    add("bench", [[x, y]], `Park bench ${index + 1}`, {
+      assetRef: `builtin:bench:${index % 3 === 0 ? "modern" : "timber"}`,
+      rotation,
+    }),
+  );
+
+  const parkTrees: Array<[number, number, string, number]> = [
+    [-207, 27, "large", 1.1],
+    [-194, 35, "small", 0.85],
+    [-180, 29, "large", 1],
+    [-165, 39, "columnar", 0.9],
+    [-150, 29, "large", 1.05],
+    [-91, 29, "small", 0.8],
+    [-82, 42, "columnar", 0.9],
+    [-205, 67, "large", 1.1],
+    [-198, 78, "small", 0.85],
+    [-147, 80, "large", 1],
+    [-128, 69, "columnar", 0.9],
+    [-110, 79, "small", 0.85],
+    [-87, 80, "large", 1.05],
+    [-62, 51, "columnar", 0.9],
+    [-29, 50, "large", 1],
+    [-27, 77, "small", 0.85],
+  ];
+  parkTrees.forEach(([x, y, variant, scale], index) =>
+    add("tree", [[x, y]], `Park tree ${index + 1}`, {
+      assetRef:
+        variant === "columnar"
+          ? "builtin:tree:columnar"
+          : `kenney:tree:${variant}`,
+      scale,
+    }),
+  );
   add(
     "plot",
     [
@@ -247,15 +340,17 @@ export function demoProject() {
           string,
         ],
     ),
-    ...homeXs.map(
-      (x, index) =>
-        [x, 70, 0, ["k", "f", "a", "t"][index % 4]] as [
-          number,
-          number,
-          number,
-          string,
-        ],
-    ),
+    ...homeXs
+      .filter((x) => x > 0)
+      .map(
+        (x, index) =>
+          [x, 70, 0, ["k", "f", "a", "t"][index % 4]] as [
+            number,
+            number,
+            number,
+            string,
+          ],
+      ),
   ];
   homes.forEach(([x, y, rotation, variant], index) =>
     add("building", [[x, y]], `Garden Lane home ${index + 1}`, {
@@ -284,12 +379,6 @@ export function demoProject() {
   });
 
   [
-    [-192, 35],
-    [-158, 52],
-    [-128, 34],
-    [-96, 58],
-    [-62, 36],
-    [-32, 60],
     [108, 34],
     [154, 36],
     [204, 52],

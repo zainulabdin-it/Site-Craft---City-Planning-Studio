@@ -361,7 +361,7 @@ export function Viewport(props: Props) {
               o.name.toLowerCase().includes("canal"));
           e.polygon = polygon(
             o.points,
-            o.kind === "boundary" ? 0 : 0.15,
+            o.kind === "boundary" ? 0 : o.elevation + 0.15,
             0,
             (o.kind === "boundary"
               ? C.Color.fromCssColorString("#eaf4dc")
