@@ -69,6 +69,7 @@ import {
 import { Viewport, type ViewAction } from "./Viewport";
 import { searchLocations, type LocationResult } from "./geocoding";
 import { importGeoJSON } from "./geojson";
+import { zarajNzProject } from "./zarajDemo";
 import {
   importCustomAsset,
   listCustomAssets,
@@ -814,9 +815,10 @@ export default function App() {
                   Open file
                 </button>
                 <button
-                  onClick={() => requestProjectSwitch(demoProject(), false)}
+                  onClick={() => requestProjectSwitch(zarajNzProject(), false)}
+                  title="Open the Zaraj-inspired New Zealand society demo"
                 >
-                  Demo
+                  Zaraj demo
                 </button>
               </div>
               <label className="field compact-save-field">
@@ -836,11 +838,21 @@ export default function App() {
                 <button onClick={() => frame()} className="compact-frame-button">
                   <Focus size={14} /> <span>Frame project</span>
                 </button>
-                <div className="compact-location" title="Christchurch, New Zealand · 43.5321° S, 172.6362° E">
+                <div
+                  className="compact-location"
+                  title={`${project.origin[1].toFixed(4)}°, ${project.origin[0].toFixed(4)}°`}
+                >
                   <MapPin size={15} />
                   <div>
-                    <b>Christchurch, NZ</b>
-                    <small>43.5321° S · 172.6362° E</small>
+                    <b>
+                      {project.name.includes("Zaraj")
+                        ? "Rolleston fringe, NZ"
+                        : "Christchurch, NZ"}
+                    </b>
+                    <small>
+                      {Math.abs(project.origin[1]).toFixed(4)}° S ·{" "}
+                      {project.origin[0].toFixed(4)}° E
+                    </small>
                   </div>
                 </div>
               </div>
@@ -1950,9 +1962,9 @@ export default function App() {
                 </div>
                 {!projects.length && <p>No saved projects here yet.</p>}
                 <button
-                  onClick={() => requestProjectSwitch(demoProject(), false)}
+                  onClick={() => requestProjectSwitch(zarajNzProject(), false)}
                 >
-                  Load labelled demo proposal
+                  Load Zaraj-inspired New Zealand society
                 </button>
               </>
             )}

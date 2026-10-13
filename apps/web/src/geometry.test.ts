@@ -12,8 +12,71 @@ import {
   moveTo,
   resizeFromHandle,
 } from "./geometry";
+import { zarajNzProject } from "./zarajDemo";
 import { applyCommand, command } from "./history";
 describe("metric geometry and project commands", () => {
+  it("builds a valid Zaraj-inspired NZ demo with complete facilities", () => {
+    const project = validateProject(zarajNzProject());
+    expect(
+      project.objects.filter((object) => object.kind === "building").length,
+    ).toBeGreaterThan(180);
+    expect(
+      project.objects.filter((object) => object.kind === "road").length,
+    ).toBeGreaterThan(20);
+    expect(
+      project.objects.some(
+        (object) => object.assetRef === "builtin:society:mosque",
+      ),
+    ).toBe(true);
+    expect(
+      project.objects.some(
+        (object) => object.assetRef === "builtin:society:hospital",
+      ),
+    ).toBe(true);
+    expect(
+      project.objects.some(
+        (object) => object.assetRef === "builtin:society:graveyard",
+      ),
+    ).toBe(true);
+    const roads = project.objects.filter((object) => object.kind === "road"),
+      homes = project.objects.filter(
+        (object) =>
+          object.kind === "building" &&
+          ["Detached house", "Townhouse"].includes(object.buildingType),
+      ),
+      distanceToSegment = (
+        point: [number, number],
+        start: [number, number],
+        end: [number, number],
+      ) => {
+        const vx = end[0] - start[0],
+          vy = end[1] - start[1],
+          wx = point[0] - start[0],
+          wy = point[1] - start[1],
+          t = Math.max(
+            0,
+            Math.min(1, (wx * vx + wy * vy) / (vx * vx + vy * vy)),
+          );
+        return Math.hypot(
+          point[0] - start[0] - t * vx,
+          point[1] - start[1] - t * vy,
+        );
+      };
+    const overlaps: string[] = [];
+    for (const home of homes)
+      for (const road of roads)
+        for (let index = 1; index < road.points.length; index++)
+          if (
+            distanceToSegment(
+              home.points[0],
+              road.points[index - 1],
+              road.points[index],
+            ) <
+            road.width / 2 + Math.min(home.width, home.depth) / 2 + 1
+          )
+            overlaps.push(`${home.name} overlaps ${road.name}`);
+    expect(overlaps).toEqual([]);
+  });
   it("resizes a building from one corner while keeping the opposite corner fixed", () => {
     const p = newProject(),
       house = newObject(p, "building", [[0, 0]]);
@@ -52,7 +115,10 @@ describe("metric geometry and project commands", () => {
   });
   it("migrates schema v2 projects with an empty project-layer list", () => {
     const current = demoProject();
-    const previous = { ...current, schemaVersion: 2 } as Record<string, unknown>;
+    const previous = { ...current, schemaVersion: 2 } as Record<
+      string,
+      unknown
+    >;
     delete previous.projectLayers;
     const migrated = validateProject(previous);
     expect(migrated.schemaVersion).toBe(3);

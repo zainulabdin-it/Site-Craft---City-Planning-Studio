@@ -426,9 +426,7 @@ export function Viewport(props: Props) {
                     position([x, maxY - 1], o.elevation + 0.34),
                   ],
                   width: 2,
-                  material: C.Color.WHITE.withAlpha(
-                    0.85 * objectOpacity(o),
-                  ),
+                  material: C.Color.WHITE.withAlpha(0.85 * objectOpacity(o)),
                 },
               });
             }
@@ -521,14 +519,13 @@ export function Viewport(props: Props) {
             !isMosque &&
             (o.buildingType === "Detached house" ||
               o.buildingType === "Townhouse");
-          const houseUri =
-            variant === "t"
-              ? "/assets/kenney/suburban/building-type-t.glb"
-              : variant === "k"
-                ? "/assets/kenney/suburban/building-type-k.glb"
-                : variant === "a"
-                  ? "/assets/kenney/suburban/building-type-a.glb"
-                  : "/assets/kenney/suburban/building-type-f.glb";
+          const houseUris: Record<string, string> = {
+            a: "/assets/kenney/suburban/building-type-a.glb",
+            f: "/assets/kenney/suburban/building-type-f.glb",
+            k: "/assets/kenney/suburban/building-type-k.glb",
+            t: "/assets/kenney/suburban/building-type-t.glb",
+          };
+          const houseUri = houseUris[variant] ?? houseUris.f;
           const houseScale = ((o.width + o.depth) / 4) * o.scale * 1.35;
           if (customUri) {
             e.position = position(o.points[0], o.elevation + 0.15);
@@ -558,7 +555,7 @@ export function Viewport(props: Props) {
               selected,
               28,
               color,
-              0.12,
+              0.34,
             );
           } else {
             e.polygon = polygon(
@@ -652,7 +649,7 @@ export function Viewport(props: Props) {
                   disableDepthTestDistance: Number.POSITIVE_INFINITY,
                   distanceDisplayCondition: new C.DistanceDisplayCondition(
                     0,
-                    2500,
+                    450,
                   ),
                 },
               });
