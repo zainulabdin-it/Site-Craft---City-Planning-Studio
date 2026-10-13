@@ -29,6 +29,7 @@ interface Props {
   project: Project;
   visible: Record<Kind, boolean>;
   opacity: Record<Kind, number>;
+  objectOpacity?: Record<string, number>;
   selected: string;
   draft: Point[];
   onClick: (p: Point, id?: string) => void;
@@ -310,6 +311,8 @@ export function Viewport(props: Props) {
     const v = viewer.current;
     if (!v) return;
     const p = props.project;
+    const objectOpacity = (object: DesignObject) =>
+      props.opacity[object.kind] * (props.objectOpacity?.[object.id] ?? 1);
     const position = (xy: Point, z = 0) =>
       C.Cartesian3.fromDegrees(...toGeo(xy, p.origin), z);
     const polygon = (
@@ -364,7 +367,7 @@ export function Viewport(props: Props) {
       let entity = v.entities.getById(o.id);
       if (
         cache.current.get(o.id) !== o ||
-        opacityCache.current.get(o.id) !== props.opacity[o.kind]
+        opacityCache.current.get(o.id) !== objectOpacity(o)
       ) {
         if (entity) v.entities.remove(entity);
         removeParts(o.id);
@@ -390,7 +393,7 @@ export function Viewport(props: Props) {
               ? C.Color.fromCssColorString("#eaf4dc")
               : color
             ).withAlpha(
-              (o.kind === "boundary" ? 0.88 : 0.62) * props.opacity[o.kind],
+              (o.kind === "boundary" ? 0.88 : 0.62) * objectOpacity(o),
             ),
           );
           if (water)
@@ -398,7 +401,7 @@ export function Viewport(props: Props) {
               new C.ImageMaterialProperty({
                 image: "/assets/textures/water-surface.svg",
                 repeat: new C.Cartesian2(8, 3),
-                color: C.Color.WHITE.withAlpha(0.88 * props.opacity[o.kind]),
+                color: C.Color.WHITE.withAlpha(0.88 * objectOpacity(o)),
               });
           e.polyline = {
             positions: [...o.points, o.points[0]].map((q) => position(q, 0.3)),
@@ -424,7 +427,7 @@ export function Viewport(props: Props) {
                   ],
                   width: 2,
                   material: C.Color.WHITE.withAlpha(
-                    0.85 * props.opacity[o.kind],
+                    0.85 * objectOpacity(o),
                   ),
                 },
               });
@@ -446,7 +449,7 @@ export function Viewport(props: Props) {
                   box: {
                     dimensions: new C.Cartesian3(1.05, 2.4, 0.45),
                     material: C.Color.fromCssColorString("#d8d2c5").withAlpha(
-                      props.opacity[o.kind],
+                      objectOpacity(o),
                     ),
                   },
                 });
@@ -464,7 +467,7 @@ export function Viewport(props: Props) {
                   position(point, o.elevation + 0.4),
                 ),
                 width: 3,
-                material: C.Color.WHITE.withAlpha(props.opacity[o.kind]),
+                material: C.Color.WHITE.withAlpha(objectOpacity(o)),
               },
             });
           }
@@ -492,7 +495,7 @@ export function Viewport(props: Props) {
                 box: {
                   dimensions: new C.Cartesian3(4, 3, 2.4),
                   material: C.Color.fromCssColorString(String(shade)).withAlpha(
-                    props.opacity[o.kind],
+                    objectOpacity(o),
                   ),
                 },
               }),
@@ -506,7 +509,7 @@ export function Viewport(props: Props) {
             material: selected
               ? C.Color.fromCssColorString("#f8b84b")
               : new C.PolylineDashMaterialProperty({
-                  color: C.Color.WHITE.withAlpha(props.opacity[o.kind]),
+                  color: C.Color.WHITE.withAlpha(objectOpacity(o)),
                   dashLength: 18,
                 }),
           };
@@ -536,7 +539,7 @@ export function Viewport(props: Props) {
             e.model = model(
               customUri,
               o.scale,
-              props.opacity[o.kind],
+              objectOpacity(o),
               selected,
               32,
               C.Color.WHITE,
@@ -551,7 +554,7 @@ export function Viewport(props: Props) {
             e.model = model(
               houseUri,
               houseScale,
-              props.opacity[o.kind],
+              objectOpacity(o),
               selected,
               28,
               color,
@@ -562,7 +565,7 @@ export function Viewport(props: Props) {
               footprint(o),
               o.elevation + 0.2,
               o.floors * o.floorHeight,
-              color.withAlpha(props.opacity[o.kind]),
+              color.withAlpha(objectOpacity(o)),
             );
             v.entities.add({
               id: `${o.id}:roof-cap`,
@@ -571,12 +574,12 @@ export function Viewport(props: Props) {
                 o.elevation + o.floors * o.floorHeight + 0.15,
                 0.35,
                 C.Color.fromCssColorString("#5b6470").withAlpha(
-                  props.opacity[o.kind],
+                  objectOpacity(o),
                 ),
               ),
             });
             if (isMosque) {
-              const opacity = props.opacity[o.kind];
+              const opacity = objectOpacity(o);
               v.entities.add({
                 id: `${o.id}:dome`,
                 position: position(
@@ -672,7 +675,7 @@ export function Viewport(props: Props) {
                     box: {
                       dimensions,
                       material: C.Color.fromCssColorString("#dc2626").withAlpha(
-                        props.opacity[o.kind],
+                        objectOpacity(o),
                       ),
                     },
                   }),
@@ -693,7 +696,7 @@ export function Viewport(props: Props) {
                     ),
                     material: C.Color.fromCssColorString(
                       facility === "temple" ? "#d97706" : "#e8dcc5",
-                    ).withAlpha(props.opacity[o.kind]),
+                    ).withAlpha(objectOpacity(o)),
                   },
                 });
               }
@@ -722,7 +725,7 @@ export function Viewport(props: Props) {
                   Math.min(0.55, o.floorHeight * 0.2),
                 ),
                 material: C.Color.fromCssColorString("#84b9d6").withAlpha(
-                  props.opacity[o.kind] * 0.78,
+                  objectOpacity(o) * 0.78,
                 ),
               },
             });
@@ -754,7 +757,7 @@ export function Viewport(props: Props) {
                   ]),
                   perPositionHeight: true,
                   material: C.Color.fromCssColorString("#66594c").withAlpha(
-                    props.opacity[o.kind],
+                    objectOpacity(o),
                   ),
                 },
               });
@@ -781,7 +784,7 @@ export function Viewport(props: Props) {
                   ? "/assets/kenney/suburban/tree-small.glb"
                   : "/assets/kenney/suburban/tree-large.glb",
                 treeScale,
-                props.opacity[o.kind],
+                objectOpacity(o),
                 selected,
                 20,
                 C.Color.fromCssColorString(
@@ -797,7 +800,7 @@ export function Viewport(props: Props) {
                   (palm ? 1.5 : 5.2) * scale,
                 ),
                 material: C.Color.fromCssColorString("#2f7d4f").withAlpha(
-                  props.opacity[o.kind],
+                  objectOpacity(o),
                 ),
               };
               v.entities.add({
@@ -808,7 +811,7 @@ export function Viewport(props: Props) {
                   topRadius: (palm ? 0.22 : 0.32) * scale,
                   bottomRadius: (palm ? 0.42 : 0.48) * scale,
                   material: C.Color.fromCssColorString("#79563d").withAlpha(
-                    props.opacity[o.kind],
+                    objectOpacity(o),
                   ),
                 },
               });
@@ -826,7 +829,7 @@ export function Viewport(props: Props) {
               e.model = model(
                 carUri,
                 carScale,
-                props.opacity[o.kind],
+                objectOpacity(o),
                 selected,
                 18,
                 C.Color.fromCssColorString(o.color),
@@ -837,7 +840,7 @@ export function Viewport(props: Props) {
               e.box = {
                 dimensions: new C.Cartesian3(0.3, 0.3, 8 * scale),
                 material: C.Color.fromCssColorString("#39434d").withAlpha(
-                  props.opacity[o.kind],
+                  objectOpacity(o),
                 ),
               };
               v.entities.add({
@@ -846,7 +849,7 @@ export function Viewport(props: Props) {
                 ellipsoid: {
                   radii: new C.Cartesian3(0.9, 0.9, 0.45),
                   material: C.Color.fromCssColorString("#ffe9a6").withAlpha(
-                    props.opacity[o.kind],
+                    objectOpacity(o),
                   ),
                 },
               });
@@ -855,7 +858,7 @@ export function Viewport(props: Props) {
               e.box = {
                 dimensions: new C.Cartesian3(0.32, 0.32, 6 * scale),
                 material: C.Color.fromCssColorString("#343a40").withAlpha(
-                  props.opacity[o.kind],
+                  objectOpacity(o),
                 ),
               };
               ["#ef4444", "#facc15", "#22c55e"].forEach((shade, index) =>
@@ -868,7 +871,7 @@ export function Viewport(props: Props) {
                   ellipsoid: {
                     radii: new C.Cartesian3(0.24, 0.24, 0.24),
                     material: C.Color.fromCssColorString(shade).withAlpha(
-                      props.opacity[o.kind],
+                      objectOpacity(o),
                     ),
                   },
                 }),
@@ -886,7 +889,7 @@ export function Viewport(props: Props) {
                   height * scale,
                 ),
                 material: C.Color.fromCssColorString(o.color).withAlpha(
-                  props.opacity[o.kind],
+                  objectOpacity(o),
                 ),
               };
             } else
@@ -900,7 +903,7 @@ export function Viewport(props: Props) {
                   o.kind === "bench" && variant === "timber"
                     ? "#8b5e3c"
                     : "#8d9ca0",
-                ).withAlpha(props.opacity[o.kind]),
+                ).withAlpha(objectOpacity(o)),
               };
             if (
               o.kind === "bench" &&
@@ -939,7 +942,7 @@ export function Viewport(props: Props) {
                     ),
                     material: C.Color.fromCssColorString(
                       wood[slat + 1],
-                    ).withAlpha(props.opacity[o.kind]),
+                    ).withAlpha(objectOpacity(o)),
                   },
                 });
               for (const side of [-0.7, 0.7])
@@ -962,7 +965,7 @@ export function Viewport(props: Props) {
                       0.85 * scale,
                     ),
                     material: C.Color.fromCssColorString("#343a40").withAlpha(
-                      props.opacity[o.kind],
+                      objectOpacity(o),
                     ),
                   },
                 });
@@ -981,7 +984,7 @@ export function Viewport(props: Props) {
                       0.18 * scale,
                     ),
                     material: C.Color.fromCssColorString(wood[slat]).withAlpha(
-                      props.opacity[o.kind],
+                      objectOpacity(o),
                     ),
                   },
                 });
@@ -1011,7 +1014,7 @@ export function Viewport(props: Props) {
                       0.14 * scale,
                     ),
                     material: C.Color.fromCssColorString(steel).withAlpha(
-                      props.opacity[o.kind],
+                      objectOpacity(o),
                     ),
                   },
                 });
@@ -1033,7 +1036,7 @@ export function Viewport(props: Props) {
                         1.15 * scale,
                       ),
                       material: C.Color.fromCssColorString(steel).withAlpha(
-                        props.opacity[o.kind],
+                        objectOpacity(o),
                       ),
                     },
                   });
@@ -1049,7 +1052,7 @@ export function Viewport(props: Props) {
                     0.04 * scale,
                   ),
                   material: C.Color.fromCssColorString("#f4c542").withAlpha(
-                    props.opacity[o.kind],
+                    objectOpacity(o),
                   ),
                 },
               });
@@ -1068,7 +1071,7 @@ export function Viewport(props: Props) {
                       Math.max(1, z + 0.8),
                     ),
                     material: C.Color.fromCssColorString("#70777b").withAlpha(
-                      props.opacity[o.kind],
+                      objectOpacity(o),
                     ),
                   },
                 });
@@ -1093,7 +1096,7 @@ export function Viewport(props: Props) {
                         ),
                         material: C.Color.fromCssColorString(
                           "#4f5c63",
-                        ).withAlpha(props.opacity[o.kind]),
+                        ).withAlpha(objectOpacity(o)),
                       },
                     });
                   }
@@ -1102,7 +1105,7 @@ export function Viewport(props: Props) {
         }
         entity = v.entities.add(e as C.Entity.ConstructorOptions);
         cache.current.set(o.id, o);
-        opacityCache.current.set(o.id, props.opacity[o.kind]);
+        opacityCache.current.set(o.id, objectOpacity(o));
       }
       entity!.show = props.visible[o.kind];
       for (const part of v.entities.values)
@@ -1113,7 +1116,7 @@ export function Viewport(props: Props) {
           o.id === props.selected
             ? new C.ColorMaterialProperty(C.Color.fromCssColorString("#f8b84b"))
             : new C.PolylineDashMaterialProperty({
-                color: C.Color.WHITE.withAlpha(props.opacity[o.kind]),
+                color: C.Color.WHITE.withAlpha(objectOpacity(o)),
                 dashLength: 18,
               });
     }

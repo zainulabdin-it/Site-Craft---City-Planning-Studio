@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   MousePointer2,
   Pentagon,
@@ -46,6 +46,7 @@ import {
   type Point,
   type DesignObject,
   type DataLayer,
+  type ProjectLayer,
 } from "./model";
 import {
   validateProject,
@@ -132,6 +133,16 @@ export default function App() {
     ),
     [engine, setEngine] = useState("Cesium 3D"),
     [layersOpen, setLayersOpen] = useState(true),
+    [currentProjectExpanded, setCurrentProjectExpanded] = useState(true),
+    [expandedProjectLayers, setExpandedProjectLayers] = useState<Set<string>>(
+      new Set(),
+    ),
+    [expandedProjectKinds, setExpandedProjectKinds] = useState<Set<string>>(
+      new Set(),
+    ),
+    [objectsOpen, setObjectsOpen] = useState(false),
+    [objectSearch, setObjectSearch] = useState(""),
+    [objectKindFilter, setObjectKindFilter] = useState<Kind | "all">("all"),
     [leftOpen, setLeftOpen] = useState(true),
     [rightOpen, setRightOpen] = useState(false),
     [toolsOpen, setToolsOpen] = useState(true),
@@ -146,6 +157,9 @@ export default function App() {
     ),
     [projects, setProjects] = useState<Project[]>([]),
     [pendingProject, setPendingProject] = useState<Project | null>(null),
+    [pendingProjectStorage, setPendingProjectStorage] = useState<
+      "local" | "server" | "computer" | null
+    >(null),
     [name, setName] = useState(""),
     [storage, setStorage] = useState<"local" | "server" | "computer">("local"),
     [locationQuery, setLocationQuery] = useState(""),
@@ -175,6 +189,7 @@ export default function App() {
     >("All"),
     [assetSearch, setAssetSearch] = useState("");
   const file = useRef<HTMLInputElement>(null),
+    projectFile = useRef<HTMLInputElement>(null),
     version = useRef(0);
   const current = project.objects.find((o) => o.id === selected);
   const refreshAssets = () =>
@@ -447,7 +462,11 @@ export default function App() {
       return false;
     }
   };
-  const switchProject = (p: Project, saved = true) => {
+  const switchProject = (
+    p: Project,
+    saved = true,
+    destination: "local" | "server" | "computer" = storage,
+  ) => {
     const validated = validateProject(p);
     setProject(validated);
     const nextVisible = Object.fromEntries(
@@ -465,17 +484,76 @@ export default function App() {
     setRedo([]);
     cancel();
     setStatus(saved ? "Saved" : "Unsaved");
+    setStorage(destination);
     setDialog(null);
     setPendingProject(null);
+    setPendingProjectStorage(null);
     frame();
   };
-  const requestProjectSwitch = (next: Project, saved = true) => {
-    if (status === "Unsaved" && project.objects.length) {
+  const requestProjectSwitch = (
+    next: Project,
+    saved = true,
+    forceConfirmation = false,
+    destination: "local" | "server" | "computer" = storage,
+  ) => {
+    const sameSite =
+      Math.abs(next.origin[0] - project.origin[0]) < 0.0001 &&
+      Math.abs(next.origin[1] - project.origin[1]) < 0.0001;
+    if (
+      project.objects.length &&
+      (forceConfirmation || status === "Unsaved" || sameSite)
+    ) {
       setPendingProject(next);
+      setPendingProjectStorage(destination);
       setDialog("confirm-switch");
       return;
     }
-    switchProject(next, saved);
+    switchProject(next, saved, destination);
+  };
+  const addProjectLayer = (source: Project) => {
+    const sameSite =
+      Math.abs(source.origin[0] - project.origin[0]) < 0.0001 &&
+      Math.abs(source.origin[1] - project.origin[1]) < 0.0001;
+    if (!sameSite) {
+      setError("Only projects at the same map location can be added as a layer.");
+      return;
+    }
+    const layer: ProjectLayer = {
+      id: crypto.randomUUID(),
+      sourceProjectId: source.id,
+      name: source.name,
+      origin: source.origin,
+      visible: true,
+      opacity: 1,
+      locked: true,
+      objects: source.objects.map((object) => ({
+        ...object,
+        id: crypto.randomUUID(),
+        nodeIds: object.nodeIds.map(() => crypto.randomUUID()),
+      })),
+      designLayers: source.designLayers.map((item) => ({ ...item })),
+    };
+    setProject((current) => ({
+      ...current,
+      projectLayers: [...current.projectLayers, layer],
+    }));
+    version.current++;
+    setStatus("Unsaved");
+    setPendingProject(null);
+    setPendingProjectStorage(null);
+    setDialog(null);
+    setLayersOpen(true);
+    setObjectsOpen(false);
+  };
+  const updateProjectLayer = (id: string, changes: Partial<ProjectLayer>) => {
+    setProject((current) => ({
+      ...current,
+      projectLayers: current.projectLayers.map((layer) =>
+        layer.id === id ? { ...layer, ...changes } : layer,
+      ),
+    }));
+    version.current++;
+    setStatus("Unsaved");
   };
   const updateDataLayer = (id: string, changes: Partial<DataLayer>) => {
     setProject((p) => ({
@@ -490,7 +568,7 @@ export default function App() {
   const open = async () => {
     try {
       if (storage === "computer") {
-        file.current?.click();
+        projectFile.current?.click();
         return;
       }
       setProjects(storage === "server" ? await loadServer() : listLocal());
@@ -540,12 +618,63 @@ export default function App() {
         setLeftOpen(true);
         setLayersOpen(true);
         setError("");
-      } else requestProjectSwitch(validateProject(parsed), true);
+      } else requestProjectSwitch(validateProject(parsed), true, true);
     } catch (err) {
       setError(String(err));
     }
     e.target.value = "";
   };
+  const openProjectComputerFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    try {
+      const selectedFile = e.target.files?.[0];
+      if (!selectedFile) return;
+      if (selectedFile.size > 5_000_000)
+        throw Error("Project file exceeds 5 MB.");
+      const parsed = JSON.parse(await selectedFile.text());
+      if (parsed?.type === "FeatureCollection" || parsed?.type === "Feature")
+        throw Error(
+          "This is a GeoJSON layer. Use Import GeoJSON inside the Layers panel.",
+        );
+      requestProjectSwitch(validateProject(parsed), true, true, "computer");
+    } catch (err) {
+      setError(String(err));
+    }
+    e.target.value = "";
+  };
+  const viewportProject = useMemo(
+    () => ({
+      ...project,
+      objects: [
+        ...project.objects,
+        ...project.projectLayers
+          .filter((layer) => layer.visible)
+          .flatMap((layer) =>
+            layer.objects.filter(
+              (object) =>
+                layer.designLayers.find((item) => item.kind === object.kind)
+                  ?.visible !== false,
+            ),
+          ),
+      ],
+    }),
+    [project],
+  );
+  const projectLayerOpacity = useMemo(
+    () =>
+      Object.fromEntries(
+        project.projectLayers.flatMap((layer) =>
+          layer.objects.map((object) => [
+            object.id,
+            layer.opacity *
+              (layer.designLayers.find((item) => item.kind === object.kind)
+                ?.opacity ?? 1),
+          ]),
+        ),
+      ),
+    [project.projectLayers],
+  );
   return (
     <div className="app">
       <header>
@@ -655,54 +784,299 @@ export default function App() {
             >
               <PanelLeftClose size={16} />
             </button>
-            <div className="eyebrow">
-              WORKSPACE <span>01</span>
+            <div className="project-setup">
+              <div className="eyebrow">
+                WORKSPACE <span>01</span>
+              </div>
+              <div className="workspace-intro">
+                <div>
+                  <h2>Your next place.</h2>
+                  <p className="muted">Plan in a real-world context.</p>
+                </div>
+              </div>
+              <div className="project-buttons">
+                <button
+                  onClick={() => {
+                    setName("New Christchurch site");
+                    setDialog("new");
+                  }}
+                >
+                  <Plus size={14} />
+                  New
+                </button>
+                <button onClick={open}>Open</button>
+                <button
+                  className="open-computer-button"
+                  onClick={() => projectFile.current?.click()}
+                  title="Open a project file from this computer"
+                >
+                  <Upload size={14} />
+                  Open file
+                </button>
+                <button
+                  onClick={() => requestProjectSwitch(demoProject(), false)}
+                >
+                  Demo
+                </button>
+              </div>
+              <label className="field compact-save-field">
+                <span>Save to</span>
+                <select
+                  value={storage}
+                  onChange={(e) =>
+                    setStorage(e.target.value as "local" | "server" | "computer")
+                  }
+                >
+                  <option value="local">This browser</option>
+                  <option value="server">Local API server</option>
+                  <option value="computer">Computer file</option>
+                </select>
+              </label>
+              <div className="project-context-row">
+                <button onClick={() => frame()} className="compact-frame-button">
+                  <Focus size={14} /> <span>Frame project</span>
+                </button>
+                <div className="compact-location" title="Christchurch, New Zealand · 43.5321° S, 172.6362° E">
+                  <MapPin size={15} />
+                  <div>
+                    <b>Christchurch, NZ</b>
+                    <small>43.5321° S · 172.6362° E</small>
+                  </div>
+                </div>
+              </div>
             </div>
-            <h2>Your next place.</h2>
-            <p className="muted">Shape a proposal in its real-world context.</p>
-            <div className="project-buttons">
-              <button
-                onClick={() => {
-                  setName("New Christchurch site");
-                  setDialog("new");
-                }}
-              >
-                <Plus size={14} />
-                New
-              </button>
-              <button onClick={open}>Open project</button>
-              <button
-                onClick={() => requestProjectSwitch(demoProject(), false)}
-              >
-                Open demo
-              </button>
-            </div>
-            <label className="field">
-              Save destination
-              <select
-                value={storage}
-                onChange={(e) =>
-                  setStorage(e.target.value as "local" | "server" | "computer")
-                }
-              >
-                <option value="local">This browser</option>
-                <option value="server">Local API server</option>
-                <option value="computer">Computer file</option>
-              </select>
-            </label>
             <button
               className="section-title layer-heading collapsible"
-              onClick={() => setLayersOpen(!layersOpen)}
+              onClick={() => {
+                const next = !layersOpen;
+                setLayersOpen(next);
+                if (next) setObjectsOpen(false);
+              }}
               aria-expanded={layersOpen}
             >
               <Layers size={15} /> Layers{" "}
               <span>
-                {kinds.length + project.dataLayers.length}{" "}
+                {kinds.length + project.dataLayers.length + project.projectLayers.length}{" "}
                 {layersOpen ? "⌃" : "⌄"}
               </span>
             </button>
             {layersOpen && (
               <div className="layers">
+                <button
+                  className="current-project-layer"
+                  onClick={() => setCurrentProjectExpanded((open) => !open)}
+                  aria-expanded={currentProjectExpanded}
+                >
+                  <Layers size={16} />
+                  <div>
+                    <b>Current project</b>
+                    <span>{project.name}</span>
+                  </div>
+                  <small>{project.objects.length} objects</small>
+                  <ChevronRight
+                    className={currentProjectExpanded ? "expanded" : ""}
+                    size={14}
+                  />
+                </button>
+                {project.projectLayers.length > 0 && (
+                  <div className="layer-group-label">Compared projects</div>
+                )}
+                {project.projectLayers.map((layer) => (
+                  <div key={layer.id} className="layer-card project-layer-card">
+                    <div
+                      className="layer project-layer-header"
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expandedProjectLayers.has(layer.id)}
+                      onClick={() =>
+                        setExpandedProjectLayers((current) => {
+                          const next = new Set(current);
+                          if (next.has(layer.id)) next.delete(layer.id);
+                          else next.add(layer.id);
+                          return next;
+                        })
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ")
+                          event.currentTarget.click();
+                      }}
+                    >
+                      <input
+                        aria-label={`Show ${layer.name} project layer`}
+                        type="checkbox"
+                        checked={layer.visible}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) =>
+                          updateProjectLayer(layer.id, { visible: event.target.checked })
+                        }
+                      />
+                      <Layers size={15} />
+                      <input
+                        className="project-layer-name"
+                        aria-label="Project layer name"
+                        value={layer.name}
+                        maxLength={100}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) =>
+                          updateProjectLayer(layer.id, { name: event.target.value })
+                        }
+                      />
+                      <small>{layer.objects.length}</small>
+                      <ChevronRight
+                        className={expandedProjectLayers.has(layer.id) ? "expanded" : ""}
+                        size={13}
+                      />
+                      <button
+                        className={layer.locked ? "icon-button active" : "icon-button"}
+                        title={layer.locked ? "Unlock layer" : "Lock layer"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          updateProjectLayer(layer.id, { locked: !layer.locked });
+                        }}
+                      >
+                        {layer.locked ? "🔒" : "🔓"}
+                      </button>
+                      <button
+                        className="icon-button"
+                        title="Remove project layer"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setProject((current) => ({
+                            ...current,
+                            projectLayers: current.projectLayers.filter(
+                              (item) => item.id !== layer.id,
+                            ),
+                          }));
+                          version.current++;
+                          setStatus("Unsaved");
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    {expandedProjectLayers.has(layer.id) && (
+                      <div className="project-sublayers">
+                        {layer.designLayers.map((subLayer) => {
+                          const Icon = icons[subLayer.kind];
+                          const key = `${layer.id}:${subLayer.kind}`;
+                          const objects = layer.objects.filter(
+                            (object) => object.kind === subLayer.kind,
+                          );
+                          if (!objects.length) return null;
+                          return (
+                            <div key={key} className="project-sublayer">
+                              <div className="project-sublayer-row">
+                                <input
+                                  aria-label={`Show ${layer.name} ${subLayer.kind} layer`}
+                                  type="checkbox"
+                                  checked={subLayer.visible}
+                                  onChange={(event) =>
+                                    updateProjectLayer(layer.id, {
+                                      designLayers: layer.designLayers.map((item) =>
+                                        item.kind === subLayer.kind
+                                          ? { ...item, visible: event.target.checked }
+                                          : item,
+                                      ),
+                                    })
+                                  }
+                                />
+                                <button
+                                  className="project-sublayer-toggle"
+                                  onClick={() =>
+                                    setExpandedProjectKinds((current) => {
+                                      const next = new Set(current);
+                                      if (next.has(key)) next.delete(key);
+                                      else next.add(key);
+                                      return next;
+                                    })
+                                  }
+                                >
+                                  <Icon size={14} />
+                                  <span>
+                                    {subLayer.kind === "boundary"
+                                      ? "Site boundary"
+                                      : subLayer.kind[0].toUpperCase() +
+                                        subLayer.kind.slice(1)}
+                                  </span>
+                                  <small>{objects.length}</small>
+                                  <ChevronRight
+                                    className={expandedProjectKinds.has(key) ? "expanded" : ""}
+                                    size={12}
+                                  />
+                                </button>
+                              </div>
+                              <label className="project-sublayer-opacity">
+                                Opacity
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.05"
+                                  value={subLayer.opacity}
+                                  style={{
+                                    background: `linear-gradient(to right, #2563eb ${subLayer.opacity * 100}%, #dbeafe ${subLayer.opacity * 100}%)`,
+                                  }}
+                                  onChange={(event) =>
+                                    updateProjectLayer(layer.id, {
+                                      designLayers: layer.designLayers.map((item) =>
+                                        item.kind === subLayer.kind
+                                          ? { ...item, opacity: Number(event.target.value) }
+                                          : item,
+                                      ),
+                                    })
+                                  }
+                                />
+                                <span>{Math.round(subLayer.opacity * 100)}%</span>
+                              </label>
+                              {expandedProjectKinds.has(key) && (
+                                <div className="project-layer-objects">
+                                  {objects.map((object) => (
+                                    <button
+                                      key={object.id}
+                                      onClick={() =>
+                                        setAction({
+                                          type: "frame",
+                                          id: object.id,
+                                          seq: Date.now(),
+                                        })
+                                      }
+                                    >
+                                      <Icon size={13} />
+                                      <span>{object.name}</span>
+                                      <small>{object.kind}</small>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <label className="layer-opacity">
+                      Opacity
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={layer.opacity}
+                        style={{
+                          background: `linear-gradient(to right, #2563eb ${layer.opacity * 100}%, #dbeafe ${layer.opacity * 100}%)`,
+                        }}
+                        onChange={(event) =>
+                          updateProjectLayer(layer.id, {
+                            opacity: Number(event.target.value),
+                          })
+                        }
+                      />
+                      <span>{Math.round(layer.opacity * 100)}%</span>
+                    </label>
+                  </div>
+                ))}
+                {currentProjectExpanded && (
+                  <div className="current-project-contents">
+                <div className="layer-group-label">Current object layers</div>
                 <button
                   className="wide import-layer"
                   onClick={() => file.current?.click()}
@@ -854,43 +1228,95 @@ export default function App() {
                     </label>
                   </div>
                 ))}
+                  </div>
+                )}
               </div>
             )}
-            <div className="section-title">
-              DESIGN OBJECTS <span>{project.objects.length}</span>
-            </div>
-            <div className="object-list">
-              {project.objects.map((o) => {
-                const Icon = icons[o.kind];
-                return (
-                  <button
-                    key={o.id}
-                    className={selected === o.id ? "object active" : "object"}
-                    onClick={() => {
-                      setSelected(o.id);
-                      setTool("select");
-                    }}
-                  >
-                    <Icon size={14} />
-                    <span>{o.name}</span>
-                    <ChevronRight size={13} />
-                  </button>
-                );
-              })}
-              {!project.objects.length && (
-                <p className="muted">Start by drawing your site boundary.</p>
-              )}
-            </div>
-            <button onClick={() => frame()} className="wide">
-              <Focus size={15} /> Frame whole project
+            <button
+              className="section-title object-heading collapsible"
+              aria-expanded={objectsOpen}
+              onClick={() => {
+                const next = !objectsOpen;
+                setObjectsOpen(next);
+                if (next) setLayersOpen(false);
+              }}
+            >
+              DESIGN OBJECTS
+              <span>
+                {project.objects.length} {objectsOpen ? "⌃" : "⌄"}
+              </span>
             </button>
-            <div className="location-card">
-              <MapPin size={17} />
-              <div>
-                <b>Christchurch, NZ</b>
-                <small>43.5321° S · 172.6362° E</small>
+            {objectsOpen && (
+              <div className="object-manager">
+                <label className="object-search">
+                  <Search size={14} />
+                  <input
+                    aria-label="Search design objects"
+                    placeholder="Search objects"
+                    value={objectSearch}
+                    onChange={(e) => setObjectSearch(e.target.value)}
+                  />
+                </label>
+                <div className="object-filters">
+                  <button
+                    className={objectKindFilter === "all" ? "active" : ""}
+                    onClick={() => setObjectKindFilter("all")}
+                  >
+                    All
+                  </button>
+                  {kinds.map((kind) => (
+                    <button
+                      key={kind}
+                      className={objectKindFilter === kind ? "active" : ""}
+                      onClick={() => setObjectKindFilter(kind)}
+                    >
+                      {kind === "boundary"
+                        ? "Boundary"
+                        : kind[0].toUpperCase() + kind.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <div className="object-list">
+                  {project.objects
+                    .filter(
+                      (object) =>
+                        (objectKindFilter === "all" ||
+                          object.kind === objectKindFilter) &&
+                        object.name
+                          .toLowerCase()
+                          .includes(objectSearch.trim().toLowerCase()),
+                    )
+                    .map((o) => {
+                      const Icon = icons[o.kind];
+                      return (
+                        <button
+                          key={o.id}
+                          className={
+                            selected === o.id ? "object active" : "object"
+                          }
+                          onClick={() => {
+                            setSelected(o.id);
+                            setTool("select");
+                          }}
+                        >
+                          <Icon size={14} />
+                          <span>{o.name}</span>
+                          <small>{o.kind}</small>
+                          <ChevronRight size={13} />
+                        </button>
+                      );
+                    })}
+                  {!project.objects.some(
+                    (object) =>
+                      (objectKindFilter === "all" ||
+                        object.kind === objectKindFilter) &&
+                      object.name
+                        .toLowerCase()
+                        .includes(objectSearch.trim().toLowerCase()),
+                  ) && <p className="muted">No matching objects.</p>}
+                </div>
               </div>
-            </div>
+            )}
           </aside>
         ) : (
           <div className="collapsed-rail left-rail">
@@ -914,7 +1340,8 @@ export default function App() {
         )}
         <main>
           <Viewport
-            project={project}
+            project={viewportProject}
+            objectOpacity={projectLayerOpacity}
             selected={selected}
             visible={visible}
             opacity={opacity}
@@ -1409,8 +1836,15 @@ export default function App() {
         hidden
         ref={file}
         type="file"
-        accept=".json,.geojson,application/json,application/geo+json"
+        accept=".geojson,application/geo+json"
         onChange={openComputerFile}
+      />
+      <input
+        hidden
+        ref={projectFile}
+        type="file"
+        accept=".json,application/json"
+        onChange={openProjectComputerFile}
       />
       <footer>
         <span>
@@ -1440,8 +1874,10 @@ export default function App() {
                     0.0001 &&
                   Math.abs(pendingProject.origin[1] - project.origin[1]) <
                     0.0001
-                  ? "The loaded project uses this same site. Save your current work before replacing it."
-                  : "You have unsaved work. Save it before opening another project."
+                  ? "This project uses the same site. Open it separately or add all of its objects as a new project layer."
+                  : status === "Unsaved"
+                    ? "You have unsaved work. Save it before opening another project."
+                    : "The selected project uses another map location. It can be opened separately, but cannot be added as a project layer."
                 : "Projects retain their exact map origin, boundary and object positions."}
             </p>
             {dialog === "confirm-switch" ? (
@@ -1451,18 +1887,35 @@ export default function App() {
                   onClick={async () => {
                     if (!pendingProject) return;
                     const next = pendingProject;
-                    if (await save()) switchProject(next, true);
+                    if (await save())
+                      switchProject(
+                        next,
+                        true,
+                        pendingProjectStorage ?? storage,
+                      );
                   }}
                 >
                   Save current &amp; open
                 </button>
                 <button
                   onClick={() => {
-                    if (pendingProject) switchProject(pendingProject, true);
+                    if (pendingProject)
+                      switchProject(
+                        pendingProject,
+                        true,
+                        pendingProjectStorage ?? storage,
+                      );
                   }}
                 >
-                  Open without saving
+                  Open as separate project
                 </button>
+                {pendingProject &&
+                  Math.abs(pendingProject.origin[0] - project.origin[0]) < 0.0001 &&
+                  Math.abs(pendingProject.origin[1] - project.origin[1]) < 0.0001 && (
+                    <button onClick={() => addProjectLayer(pendingProject)}>
+                      Add as separate project
+                    </button>
+                  )}
               </>
             ) : dialog === "new" ? (
               <>
@@ -1506,6 +1959,7 @@ export default function App() {
             <button
               onClick={() => {
                 setPendingProject(null);
+                setPendingProjectStorage(null);
                 setDialog(null);
               }}
             >
