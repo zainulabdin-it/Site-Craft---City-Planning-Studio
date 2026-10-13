@@ -23,6 +23,11 @@ First vertical slice completed on 13 October 2026:
 - browser reload restores custom asset files and project references;
 - missing custom models fall back to editable building geometry;
 - production build and all current unit tests pass.
+- built-in society library expanded with faith, school, health, commercial,
+  community, burial, emergency, street, recreation and utility objects;
+- asset search and category filters added for the larger catalogue;
+- graveyard rows, playground equipment, sports-field markings, streetlights,
+  traffic signals and facility labels added to the 3D view.
 
 Portable `.sitecraft` packages and the remaining society object packs are the next milestones.
 

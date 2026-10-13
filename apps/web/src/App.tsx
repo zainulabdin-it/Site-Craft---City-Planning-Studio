@@ -74,6 +74,11 @@ import {
   type CustomAsset,
   type CustomAssetCategory,
 } from "./assetStorage";
+import {
+  societyAssets,
+  societyAssetCategories,
+  type SocietyAssetCategory,
+} from "./societyAssets";
 function initial() {
   try {
     const all = listLocal();
@@ -149,10 +154,12 @@ export default function App() {
     [placementAsset, setPlacementAsset] = useState<{
       assetRef: string;
       name: string;
+      kind: Kind;
       buildingType: DesignObject["buildingType"];
       width: number;
       depth: number;
       height: number;
+      color: string;
     } | null>(null),
     [customAssets, setCustomAssets] = useState<CustomAsset[]>([]),
     [assetDialog, setAssetDialog] = useState(false),
@@ -162,7 +169,11 @@ export default function App() {
     [assetWidth, setAssetWidth] = useState(12),
     [assetDepth, setAssetDepth] = useState(12),
     [assetHeight, setAssetHeight] = useState(8),
-    [importingAsset, setImportingAsset] = useState(false);
+    [importingAsset, setImportingAsset] = useState(false),
+    [assetCategoryFilter, setAssetCategoryFilter] = useState<
+      SocietyAssetCategory | "All" | "My Assets"
+    >("All"),
+    [assetSearch, setAssetSearch] = useState("");
   const file = useRef<HTMLInputElement>(null),
     version = useRef(0);
   const current = project.objects.find((o) => o.id === selected);
@@ -299,12 +310,34 @@ export default function App() {
       return;
     }
     if (placementAsset) {
-      const o = newObject(project, "building", [p]);
+      const points: Point[] =
+        placementAsset.kind === "plot"
+          ? [
+              [
+                p[0] - placementAsset.width / 2,
+                p[1] - placementAsset.depth / 2,
+              ],
+              [
+                p[0] + placementAsset.width / 2,
+                p[1] - placementAsset.depth / 2,
+              ],
+              [
+                p[0] + placementAsset.width / 2,
+                p[1] + placementAsset.depth / 2,
+              ],
+              [
+                p[0] - placementAsset.width / 2,
+                p[1] + placementAsset.depth / 2,
+              ],
+            ]
+          : [p];
+      const o = newObject(project, placementAsset.kind, points);
       o.name = placementAsset.name;
       o.assetRef = placementAsset.assetRef;
       o.buildingType = placementAsset.buildingType;
       o.width = placementAsset.width;
       o.depth = placementAsset.depth;
+      o.color = placementAsset.color;
       o.floors = Math.max(1, Math.round(placementAsset.height / 3));
       o.floorHeight = Math.min(
         6,
@@ -863,19 +896,19 @@ export default function App() {
           <div className="collapsed-rail left-rail">
             <button
               className="panel-tab"
-              aria-label="Open project browser"
-              onClick={() => setLeftOpen(true)}
-            >
-              <FolderOpen size={16} />
-              <span>Browser</span>
-            </button>
-            <button
-              className="panel-tab"
               aria-label="Open layers panel"
               onClick={() => setLeftOpen(true)}
             >
               <Layers size={16} />
               <span>Layers</span>
+            </button>
+            <button
+              className={toolsOpen ? "panel-tab active" : "panel-tab"}
+              aria-label={toolsOpen ? "Collapse tools" : "Open tools"}
+              onClick={() => setToolsOpen((open) => !open)}
+            >
+              <Move size={16} />
+              <span>Tools</span>
             </button>
           </div>
         )}
@@ -1205,85 +1238,133 @@ export default function App() {
               </div>
             )}
             <div className="section-title">
-              ASSET LIBRARY <span>{5 + customAssets.length}</span>
+              ASSET LIBRARY{" "}
+              <span>{societyAssets.length + 4 + customAssets.length}</span>
             </div>
             <p className="muted small">
               Choose an object, then click the map to place it.
             </p>
+            <label className="asset-search">
+              <Search size={14} />
+              <input
+                aria-label="Search assets"
+                placeholder="Search assets"
+                value={assetSearch}
+                onChange={(e) => setAssetSearch(e.target.value)}
+              />
+            </label>
+            <div className="asset-categories">
+              {[...societyAssetCategories, "My Assets"].map((category) => (
+                <button
+                  key={category}
+                  className={assetCategoryFilter === category ? "active" : ""}
+                  onClick={() =>
+                    setAssetCategoryFilter(
+                      category as SocietyAssetCategory | "All" | "My Assets",
+                    )
+                  }
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
             <div className="assets">
-              <button
-                className={
-                  placementAsset?.assetRef === "builtin:society:mosque"
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  setPlacementAsset({
-                    assetRef: "builtin:society:mosque",
-                    name: "Community mosque",
-                    buildingType: "Place of worship",
-                    width: 28,
-                    depth: 22,
-                    height: 10,
-                  });
-                  setTool("building");
-                  setDraft([]);
-                }}
-              >
-                <Landmark size={24} />
-                <span>Mosque</span>
-              </button>
-              {(["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
-                const Icon = icons[k];
-                return (
+              {assetCategoryFilter === "All" &&
+                (["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
+                  const Icon = icons[k];
+                  return (
+                    <button
+                      key={k}
+                      className={tool === k && !placementAsset ? "active" : ""}
+                      onClick={() => {
+                        setPlacementAsset(null);
+                        setTool(k);
+                        setDraft([]);
+                      }}
+                    >
+                      <Icon size={24} />
+                      <span>{k[0].toUpperCase() + k.slice(1)}</span>
+                    </button>
+                  );
+                })}
+              {societyAssets
+                .filter(
+                  (asset) =>
+                    assetCategoryFilter !== "My Assets" &&
+                    (assetCategoryFilter === "All" ||
+                      asset.category === assetCategoryFilter) &&
+                    asset.name
+                      .toLowerCase()
+                      .includes(assetSearch.toLowerCase()),
+                )
+                .map((asset) => {
+                  const Icon =
+                    asset.category === "Faith" ? Landmark : Building2;
+                  return (
+                    <button
+                      key={asset.assetRef}
+                      className={
+                        placementAsset?.assetRef === asset.assetRef
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() => {
+                        setPlacementAsset(asset);
+                        setTool(asset.kind);
+                        setDraft([]);
+                      }}
+                    >
+                      <Icon size={24} />
+                      <span>{asset.name}</span>
+                      <small>{asset.category}</small>
+                    </button>
+                  );
+                })}
+              {customAssets
+                .filter(
+                  (asset) =>
+                    (assetCategoryFilter === "All" ||
+                      assetCategoryFilter === "My Assets") &&
+                    asset.name
+                      .toLowerCase()
+                      .includes(assetSearch.toLowerCase()),
+                )
+                .map((asset) => (
                   <button
-                    key={k}
-                    className={tool === k ? "active" : ""}
+                    key={asset.id}
+                    className={
+                      placementAsset?.assetRef === `custom:${asset.id}`
+                        ? "active"
+                        : ""
+                    }
+                    title={`${asset.category} · ${(asset.size / 1024 / 1024).toFixed(1)} MB`}
                     onClick={() => {
-                      setPlacementAsset(null);
-                      setTool(k);
+                      setPlacementAsset({
+                        assetRef: `custom:${asset.id}`,
+                        name: asset.name,
+                        kind: "building",
+                        buildingType:
+                          asset.category === "Faith"
+                            ? "Place of worship"
+                            : asset.category === "Education"
+                              ? "School"
+                              : asset.category === "Health"
+                                ? "Clinic"
+                                : "Commercial",
+                        width: asset.width,
+                        depth: asset.depth,
+                        height: asset.height,
+                        color: "#d8e2ea",
+                      });
+                      setTool("building");
                       setDraft([]);
                     }}
                   >
-                    <Icon size={24} />
-                    <span>{k[0].toUpperCase() + k.slice(1)}</span>
+                    <Box size={24} />
+                    <span>{asset.name}</span>
+                    <small>{asset.category}</small>
                   </button>
-                );
-              })}
-              {customAssets.map((asset) => (
-                <button
-                  key={asset.id}
-                  className={
-                    placementAsset?.assetRef === `custom:${asset.id}`
-                      ? "active"
-                      : ""
-                  }
-                  title={`${asset.category} · ${(asset.size / 1024 / 1024).toFixed(1)} MB`}
-                  onClick={() => {
-                    setPlacementAsset({
-                      assetRef: `custom:${asset.id}`,
-                      name: asset.name,
-                      buildingType:
-                        asset.category === "Faith"
-                          ? "Place of worship"
-                          : asset.category === "Education"
-                            ? "School"
-                            : asset.category === "Health"
-                              ? "Clinic"
-                              : "Commercial",
-                      width: asset.width,
-                      depth: asset.depth,
-                      height: asset.height,
-                    });
-                    setTool("building");
-                    setDraft([]);
-                  }}
-                >
-                  <Box size={24} />
-                  <span>{asset.name}</span>
-                  <small>{asset.category}</small>
-                </button>
-              ))}
+                ))}
               <button
                 className="asset-import"
                 onClick={() => setAssetDialog(true)}
@@ -1541,6 +1622,7 @@ export default function App() {
                     setPlacementAsset({
                       assetRef: `custom:${asset.id}`,
                       name: asset.name,
+                      kind: "building",
                       buildingType:
                         asset.category === "Faith"
                           ? "Place of worship"
@@ -1552,6 +1634,7 @@ export default function App() {
                       width: asset.width,
                       depth: asset.depth,
                       height: asset.height,
+                      color: "#d8e2ea",
                     });
                     setTool("building");
                     setAssetDialog(false);

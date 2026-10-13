@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { newObject, newProject, projectSchema } from "./model";
+import { societyAssets } from "./societyAssets";
 
 describe("society and custom assets", () => {
+  it("provides unique, editable society assets", () => {
+    expect(societyAssets.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(societyAssets.map((asset) => asset.assetRef)).size).toBe(
+      societyAssets.length,
+    );
+    expect(societyAssets.map((asset) => asset.name)).toEqual(
+      expect.arrayContaining(["Mosque", "School", "Hospital", "Graveyard"]),
+    );
+  });
   it("stores a mosque as an editable building", () => {
     const project = newProject("Society plan");
     const mosque = newObject(project, "building", [[0, 0]]);

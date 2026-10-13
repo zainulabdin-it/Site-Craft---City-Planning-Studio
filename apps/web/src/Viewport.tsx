@@ -380,7 +380,8 @@ export function Viewport(props: Props) {
             o.kind === "plot" &&
             (o.name.toLowerCase().includes("water") ||
               o.name.toLowerCase().includes("pond") ||
-              o.name.toLowerCase().includes("canal"));
+              o.name.toLowerCase().includes("canal") ||
+              o.name.toLowerCase().includes("fountain"));
           e.polygon = polygon(
             o.points,
             o.kind === "boundary" ? 0 : o.elevation + 0.15,
@@ -428,6 +429,74 @@ export function Viewport(props: Props) {
                 },
               });
             }
+          }
+          if (o.kind === "plot" && o.assetRef === "builtin:society:graveyard") {
+            const xs = o.points.map(([x]) => x),
+              ys = o.points.map(([, y]) => y),
+              minX = Math.min(...xs),
+              maxX = Math.max(...xs),
+              minY = Math.min(...ys),
+              maxY = Math.max(...ys);
+            let grave = 0;
+            for (let x = minX + 4; x < maxX - 2; x += 5.5)
+              for (let y = minY + 4; y < maxY - 2; y += 7) {
+                v.entities.add({
+                  id: `${o.id}:grave-${grave++}`,
+                  position: position([x, y], o.elevation + 0.48),
+                  box: {
+                    dimensions: new C.Cartesian3(1.05, 2.4, 0.45),
+                    material: C.Color.fromCssColorString("#d8d2c5").withAlpha(
+                      props.opacity[o.kind],
+                    ),
+                  },
+                });
+              }
+          }
+          if (
+            o.kind === "plot" &&
+            o.assetRef === "builtin:society:sports-field"
+          ) {
+            const ring = [...o.points, o.points[0]];
+            v.entities.add({
+              id: `${o.id}:field-lines`,
+              polyline: {
+                positions: ring.map((point) =>
+                  position(point, o.elevation + 0.4),
+                ),
+                width: 3,
+                material: C.Color.WHITE.withAlpha(props.opacity[o.kind]),
+              },
+            });
+          }
+          if (
+            o.kind === "plot" &&
+            o.assetRef === "builtin:society:playground"
+          ) {
+            const center: Point = [
+              o.points.reduce((sum, point) => sum + point[0], 0) /
+                o.points.length,
+              o.points.reduce((sum, point) => sum + point[1], 0) /
+                o.points.length,
+            ];
+            [
+              [-7, 0, "#e84c3d"],
+              [0, 4, "#2f80ed"],
+              [7, -2, "#f2c94c"],
+            ].forEach(([dx, dy, shade], index) =>
+              v.entities.add({
+                id: `${o.id}:play-${index}`,
+                position: position(
+                  [center[0] + Number(dx), center[1] + Number(dy)],
+                  o.elevation + 1.4,
+                ),
+                box: {
+                  dimensions: new C.Cartesian3(4, 3, 2.4),
+                  material: C.Color.fromCssColorString(String(shade)).withAlpha(
+                    props.opacity[o.kind],
+                  ),
+                },
+              }),
+            );
           }
         } else if (o.kind === "road") {
           e.polyline = {
@@ -560,6 +629,74 @@ export function Viewport(props: Props) {
                     C.Color.fromCssColorString("#2d9b68").withAlpha(opacity),
                 },
               });
+            }
+            if (o.assetRef.startsWith("builtin:society:")) {
+              const facility = o.assetRef.split(":").at(-1) || "facility";
+              v.entities.add({
+                id: `${o.id}:label`,
+                position: position(
+                  o.points[0],
+                  o.elevation + o.floors * o.floorHeight + 5.5,
+                ),
+                label: {
+                  text: o.name,
+                  font: "600 14px sans-serif",
+                  fillColor: C.Color.fromCssColorString("#172b4d"),
+                  outlineColor: C.Color.WHITE,
+                  outlineWidth: 4,
+                  style: C.LabelStyle.FILL_AND_OUTLINE,
+                  pixelOffset: new C.Cartesian2(0, -8),
+                  disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                  distanceDisplayCondition: new C.DistanceDisplayCondition(
+                    0,
+                    2500,
+                  ),
+                },
+              });
+              if (["clinic", "hospital", "pharmacy"].includes(facility)) {
+                const orientation = C.Transforms.headingPitchRollQuaternion(
+                  position(o.points[0]),
+                  new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
+                );
+                [
+                  new C.Cartesian3(o.width * 0.3, 0.35, 1.4),
+                  new C.Cartesian3(1.4, 0.35, o.width * 0.3),
+                ].forEach((dimensions, index) =>
+                  v.entities.add({
+                    id: `${o.id}:health-cross-${index}`,
+                    position: position(
+                      o.points[0],
+                      o.elevation + o.floors * o.floorHeight + 0.55,
+                    ),
+                    orientation,
+                    box: {
+                      dimensions,
+                      material: C.Color.fromCssColorString("#dc2626").withAlpha(
+                        props.opacity[o.kind],
+                      ),
+                    },
+                  }),
+                );
+              }
+              if (["church", "temple", "gurdwara"].includes(facility)) {
+                v.entities.add({
+                  id: `${o.id}:faith-crown`,
+                  position: position(
+                    o.points[0],
+                    o.elevation + o.floors * o.floorHeight + 2.2,
+                  ),
+                  ellipsoid: {
+                    radii: new C.Cartesian3(
+                      o.width * 0.22,
+                      o.depth * 0.22,
+                      facility === "church" ? 4.5 : 2.5,
+                    ),
+                    material: C.Color.fromCssColorString(
+                      facility === "temple" ? "#d97706" : "#e8dcc5",
+                    ).withAlpha(props.opacity[o.kind]),
+                  },
+                });
+              }
             }
           }
           const buildingOrientation = C.Transforms.headingPitchRollQuaternion(
@@ -695,6 +832,63 @@ export function Viewport(props: Props) {
                 C.Color.fromCssColorString(o.color),
                 0.28,
               );
+            } else if (o.assetRef === "builtin:society:streetlight") {
+              e.position = position(o.points[0], z + 4 * scale);
+              e.box = {
+                dimensions: new C.Cartesian3(0.3, 0.3, 8 * scale),
+                material: C.Color.fromCssColorString("#39434d").withAlpha(
+                  props.opacity[o.kind],
+                ),
+              };
+              v.entities.add({
+                id: `${o.id}:lamp`,
+                position: position(o.points[0], z + 8.1 * scale),
+                ellipsoid: {
+                  radii: new C.Cartesian3(0.9, 0.9, 0.45),
+                  material: C.Color.fromCssColorString("#ffe9a6").withAlpha(
+                    props.opacity[o.kind],
+                  ),
+                },
+              });
+            } else if (o.assetRef === "builtin:society:traffic-signal") {
+              e.position = position(o.points[0], z + 3 * scale);
+              e.box = {
+                dimensions: new C.Cartesian3(0.32, 0.32, 6 * scale),
+                material: C.Color.fromCssColorString("#343a40").withAlpha(
+                  props.opacity[o.kind],
+                ),
+              };
+              ["#ef4444", "#facc15", "#22c55e"].forEach((shade, index) =>
+                v.entities.add({
+                  id: `${o.id}:signal-${index}`,
+                  position: position(
+                    o.points[0],
+                    z + (6.8 - index * 0.55) * scale,
+                  ),
+                  ellipsoid: {
+                    radii: new C.Cartesian3(0.24, 0.24, 0.24),
+                    material: C.Color.fromCssColorString(shade).withAlpha(
+                      props.opacity[o.kind],
+                    ),
+                  },
+                }),
+              );
+            } else if (
+              o.kind === "bench" &&
+              o.assetRef.startsWith("builtin:society:")
+            ) {
+              const height = o.floors * o.floorHeight;
+              e.position = position(o.points[0], z + (height * scale) / 2);
+              e.box = {
+                dimensions: new C.Cartesian3(
+                  o.width * scale,
+                  o.depth * scale,
+                  height * scale,
+                ),
+                material: C.Color.fromCssColorString(o.color).withAlpha(
+                  props.opacity[o.kind],
+                ),
+              };
             } else
               e.box = {
                 dimensions: new C.Cartesian3(
@@ -708,7 +902,10 @@ export function Viewport(props: Props) {
                     : "#8d9ca0",
                 ).withAlpha(props.opacity[o.kind]),
               };
-            if (o.kind === "bench") {
+            if (
+              o.kind === "bench" &&
+              !o.assetRef.startsWith("builtin:society:")
+            ) {
               const wood =
                 variant === "stone"
                   ? ["#b7b0a7", "#97918a", "#c9c3bb"]
