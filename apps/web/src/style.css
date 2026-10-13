@@ -897,6 +897,51 @@ textarea {
 .assets button.active {
   background: #e8f0ff;
 }
+.assets button small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #64748b;
+}
+.assets .asset-import {
+  border: 1px dashed #2563eb;
+  color: #1d4ed8;
+  background: #eff5ff;
+}
+.asset-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+.asset-drop {
+  min-height: 112px;
+  margin: 16px 0;
+  border: 1px dashed #93b4f4;
+  border-radius: 10px;
+  background: #eff5ff;
+  color: #172b4d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.asset-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.asset-drop small {
+  color: #64748b;
+}
+.field-grid.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
 .export {
   display: flex;
   flex-wrap: wrap;

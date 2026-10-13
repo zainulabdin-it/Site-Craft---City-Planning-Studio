@@ -33,6 +33,8 @@ import {
   Square,
   Pencil,
   Hand,
+  Upload,
+  Landmark,
 } from "lucide-react";
 import {
   newProject,
@@ -66,6 +68,12 @@ import {
 import { Viewport, type ViewAction } from "./Viewport";
 import { searchLocations, type LocationResult } from "./geocoding";
 import { importGeoJSON } from "./geojson";
+import {
+  importCustomAsset,
+  listCustomAssets,
+  type CustomAsset,
+  type CustomAssetCategory,
+} from "./assetStorage";
 function initial() {
   try {
     const all = listLocal();
@@ -137,10 +145,37 @@ export default function App() {
     [storage, setStorage] = useState<"local" | "server" | "computer">("local"),
     [locationQuery, setLocationQuery] = useState(""),
     [locationResults, setLocationResults] = useState<LocationResult[]>([]),
-    [searching, setSearching] = useState(false);
+    [searching, setSearching] = useState(false),
+    [placementAsset, setPlacementAsset] = useState<{
+      assetRef: string;
+      name: string;
+      buildingType: DesignObject["buildingType"];
+      width: number;
+      depth: number;
+      height: number;
+    } | null>(null),
+    [customAssets, setCustomAssets] = useState<CustomAsset[]>([]),
+    [assetDialog, setAssetDialog] = useState(false),
+    [assetFile, setAssetFile] = useState<File | null>(null),
+    [assetName, setAssetName] = useState(""),
+    [assetCategory, setAssetCategory] = useState<CustomAssetCategory>("Custom"),
+    [assetWidth, setAssetWidth] = useState(12),
+    [assetDepth, setAssetDepth] = useState(12),
+    [assetHeight, setAssetHeight] = useState(8),
+    [importingAsset, setImportingAsset] = useState(false);
   const file = useRef<HTMLInputElement>(null),
     version = useRef(0);
   const current = project.objects.find((o) => o.id === selected);
+  const refreshAssets = () =>
+    listCustomAssets()
+      .then(setCustomAssets)
+      .catch((e) => setError(`Asset library could not open: ${String(e)}`));
+  useEffect(() => {
+    refreshAssets();
+    window.addEventListener("sitecraft-assets-changed", refreshAssets);
+    return () =>
+      window.removeEventListener("sitecraft-assets-changed", refreshAssets);
+  }, []);
   const edit = (
     updates: DesignObject[],
     remove: string[] = [],
@@ -182,6 +217,7 @@ export default function App() {
   const cancel = () => {
     setDraft([]);
     setTool("select");
+    setPlacementAsset(null);
   };
   const history = (back: boolean) => {
     try {
@@ -260,6 +296,26 @@ export default function App() {
       tool !== "boundary"
     ) {
       setError("Draw a project boundary first.");
+      return;
+    }
+    if (placementAsset) {
+      const o = newObject(project, "building", [p]);
+      o.name = placementAsset.name;
+      o.assetRef = placementAsset.assetRef;
+      o.buildingType = placementAsset.buildingType;
+      o.width = placementAsset.width;
+      o.depth = placementAsset.depth;
+      o.floors = Math.max(1, Math.round(placementAsset.height / 3));
+      o.floorHeight = Math.min(
+        6,
+        Math.max(2, placementAsset.height / o.floors),
+      );
+      o.roof = "pitched";
+      if (edit([o], [], `Place ${placementAsset.name}`)) {
+        setSelected(o.id);
+        setTool("select");
+        setPlacementAsset(null);
+      }
       return;
     }
     if (tool === "rectangle" || tool === "circle") {
@@ -928,6 +984,7 @@ export default function App() {
                       return;
                     }
                     setTool(t);
+                    setPlacementAsset(null);
                     setDraft([]);
                     if (t === "hand") setSelected("");
                   }}
@@ -1049,7 +1106,9 @@ export default function App() {
                   ? current
                     ? `Click a new position for ${current.name}, or drag it`
                     : "Click an object to move, then click its new position"
-                  : `Click the map to ${["road", "boundary", "plot", "rectangle", "circle", "freehand"].includes(tool) ? "draw" : "place"} ${tool}`}
+                  : placementAsset
+                    ? `Click the map to place ${placementAsset.name}`
+                    : `Click the map to ${["road", "boundary", "plot", "rectangle", "circle", "freehand"].includes(tool) ? "draw" : "place"} ${tool}`}
               </b>
               {["road", "boundary", "plot", "freehand"].includes(tool) && (
                 <>
@@ -1146,12 +1205,34 @@ export default function App() {
               </div>
             )}
             <div className="section-title">
-              ASSET LIBRARY <span>4</span>
+              ASSET LIBRARY <span>{5 + customAssets.length}</span>
             </div>
             <p className="muted small">
-              Editable planning objects with selectable designs
+              Choose an object, then click the map to place it.
             </p>
             <div className="assets">
+              <button
+                className={
+                  placementAsset?.assetRef === "builtin:society:mosque"
+                    ? "active"
+                    : ""
+                }
+                onClick={() => {
+                  setPlacementAsset({
+                    assetRef: "builtin:society:mosque",
+                    name: "Community mosque",
+                    buildingType: "Place of worship",
+                    width: 28,
+                    depth: 22,
+                    height: 10,
+                  });
+                  setTool("building");
+                  setDraft([]);
+                }}
+              >
+                <Landmark size={24} />
+                <span>Mosque</span>
+              </button>
               {(["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
                 const Icon = icons[k];
                 return (
@@ -1159,6 +1240,7 @@ export default function App() {
                     key={k}
                     className={tool === k ? "active" : ""}
                     onClick={() => {
+                      setPlacementAsset(null);
                       setTool(k);
                       setDraft([]);
                     }}
@@ -1168,6 +1250,47 @@ export default function App() {
                   </button>
                 );
               })}
+              {customAssets.map((asset) => (
+                <button
+                  key={asset.id}
+                  className={
+                    placementAsset?.assetRef === `custom:${asset.id}`
+                      ? "active"
+                      : ""
+                  }
+                  title={`${asset.category} · ${(asset.size / 1024 / 1024).toFixed(1)} MB`}
+                  onClick={() => {
+                    setPlacementAsset({
+                      assetRef: `custom:${asset.id}`,
+                      name: asset.name,
+                      buildingType:
+                        asset.category === "Faith"
+                          ? "Place of worship"
+                          : asset.category === "Education"
+                            ? "School"
+                            : asset.category === "Health"
+                              ? "Clinic"
+                              : "Commercial",
+                      width: asset.width,
+                      depth: asset.depth,
+                      height: asset.height,
+                    });
+                    setTool("building");
+                    setDraft([]);
+                  }}
+                >
+                  <Box size={24} />
+                  <span>{asset.name}</span>
+                  <small>{asset.category}</small>
+                </button>
+              ))}
+              <button
+                className="asset-import"
+                onClick={() => setAssetDialog(true)}
+              >
+                <Upload size={24} />
+                <span>Import GLB</span>
+              </button>
             </div>
             <div className="export">
               <button
@@ -1310,6 +1433,152 @@ export default function App() {
           </section>
         </div>
       )}
+      {assetDialog && (
+        <div className="modal-backdrop">
+          <section
+            role="dialog"
+            aria-label="Import 3D asset"
+            className="modal asset-modal"
+          >
+            <h2>Import a 3D asset</h2>
+            <p className="muted">
+              Add one binary GLB model to My Assets. The file stays in this
+              browser.
+            </p>
+            <label className="asset-drop">
+              <Upload size={24} />
+              <b>{assetFile?.name || "Choose a .glb file"}</b>
+              <small>Maximum 25 MB</small>
+              <input
+                type="file"
+                accept=".glb,model/gltf-binary"
+                onChange={(e) => {
+                  const next = e.target.files?.[0] || null;
+                  setAssetFile(next);
+                  if (next && !assetName)
+                    setAssetName(next.name.replace(/\.glb$/i, ""));
+                }}
+              />
+            </label>
+            <div className="field-grid">
+              <label className="field">
+                Asset name
+                <input
+                  value={assetName}
+                  maxLength={60}
+                  onChange={(e) => setAssetName(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Category
+                <select
+                  value={assetCategory}
+                  onChange={(e) =>
+                    setAssetCategory(e.target.value as CustomAssetCategory)
+                  }
+                >
+                  {[
+                    "Faith",
+                    "Education",
+                    "Health",
+                    "Commercial",
+                    "Community",
+                    "Street",
+                    "Park",
+                    "Utility",
+                    "Custom",
+                  ].map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="field-grid three">
+              {[
+                ["Width (m)", assetWidth, setAssetWidth],
+                ["Depth (m)", assetDepth, setAssetDepth],
+                ["Height (m)", assetHeight, setAssetHeight],
+              ].map(([label, value, setter]) => (
+                <label className="field" key={label as string}>
+                  {label as string}
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={value as number}
+                    onChange={(e) =>
+                      (setter as React.Dispatch<React.SetStateAction<number>>)(
+                        Number(e.target.value),
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="primary"
+                disabled={
+                  importingAsset ||
+                  !assetFile ||
+                  !assetName.trim() ||
+                  [assetWidth, assetDepth, assetHeight].some(
+                    (value) => !Number.isFinite(value) || value < 1,
+                  )
+                }
+                onClick={async () => {
+                  if (!assetFile) return;
+                  setImportingAsset(true);
+                  try {
+                    const asset = await importCustomAsset(assetFile, {
+                      name: assetName.trim(),
+                      category: assetCategory,
+                      width: assetWidth,
+                      depth: assetDepth,
+                      height: assetHeight,
+                    });
+                    setCustomAssets(await listCustomAssets());
+                    setPlacementAsset({
+                      assetRef: `custom:${asset.id}`,
+                      name: asset.name,
+                      buildingType:
+                        asset.category === "Faith"
+                          ? "Place of worship"
+                          : asset.category === "Education"
+                            ? "School"
+                            : asset.category === "Health"
+                              ? "Clinic"
+                              : "Commercial",
+                      width: asset.width,
+                      depth: asset.depth,
+                      height: asset.height,
+                    });
+                    setTool("building");
+                    setAssetDialog(false);
+                    setAssetFile(null);
+                    setAssetName("");
+                    setError("");
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setImportingAsset(false);
+                  }
+                }}
+              >
+                {importingAsset ? "Importing…" : "Add to library"}
+              </button>
+              <button
+                onClick={() => {
+                  setAssetDialog(false);
+                  setAssetFile(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -1439,11 +1708,18 @@ function Properties({
                 })
               }
             >
-              {["Detached house", "Townhouse", "Apartment", "Commercial"].map(
-                (x) => (
-                  <option key={x}>{x}</option>
-                ),
-              )}
+              {[
+                "Detached house",
+                "Townhouse",
+                "Apartment",
+                "Commercial",
+                "Place of worship",
+                "School",
+                "Clinic",
+                "Community",
+              ].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
             </select>
           </label>
           <div className="field-grid">
@@ -1479,6 +1755,9 @@ function Properties({
               {number("scale", "3D model size", 0.5, 2, 0.1)}
             </>
           )}
+          {(o.assetRef.startsWith("custom:") ||
+            o.assetRef.startsWith("builtin:society:")) &&
+            number("scale", "3D model size", 0.2, 5, 0.1)}
           <div className="measure">
             <span>Footprint / floor area</span>
             <b>

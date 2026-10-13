@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as C from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import {
@@ -8,6 +8,7 @@ import {
   type DesignObject,
 } from "./model";
 import { toGeo, toLocal, footprint, area, length } from "./geometry";
+import { getCustomAssetUrlSync, hydrateCustomAssetUrls } from "./assetStorage";
 export type ViewAction = {
   type:
     | "frame"
@@ -39,12 +40,33 @@ interface Props {
   navigationMode: boolean;
 }
 export function Viewport(props: Props) {
+  const [assetVersion, setAssetVersion] = useState(0);
   const container = useRef<HTMLDivElement>(null),
     viewer = useRef<C.Viewer | null>(null),
     latest = useRef(props),
     cache = useRef(new Map<string, DesignObject>()),
     opacityCache = useRef(new Map<string, number>());
   latest.current = props;
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      hydrateCustomAssetUrls()
+        .then(() => active && setAssetVersion((value) => value + 1))
+        .catch((error) =>
+          latest.current.onError(
+            `Custom assets could not load: ${String(error)}`,
+          ),
+        );
+    refresh();
+    window.addEventListener("sitecraft-assets-changed", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("sitecraft-assets-changed", refresh);
+    };
+  }, []);
+  useEffect(() => {
+    cache.current.clear();
+  }, [assetVersion]);
   const roadKey = JSON.stringify([
     props.project.origin,
     props.project.objects.filter((o) => o.kind === "road"),
@@ -420,9 +442,13 @@ export function Viewport(props: Props) {
                 }),
           };
         } else if (o.kind === "building") {
+          const customUri = getCustomAssetUrlSync(o.assetRef);
+          const isMosque = o.assetRef === "builtin:society:mosque";
           const useHouseModel =
-            o.buildingType === "Detached house" ||
-            o.buildingType === "Townhouse";
+            !customUri &&
+            !isMosque &&
+            (o.buildingType === "Detached house" ||
+              o.buildingType === "Townhouse");
           const houseUri =
             variant === "t"
               ? "/assets/kenney/suburban/building-type-t.glb"
@@ -432,7 +458,22 @@ export function Viewport(props: Props) {
                   ? "/assets/kenney/suburban/building-type-a.glb"
                   : "/assets/kenney/suburban/building-type-f.glb";
           const houseScale = ((o.width + o.depth) / 4) * o.scale * 1.35;
-          if (useHouseModel) {
+          if (customUri) {
+            e.position = position(o.points[0], o.elevation + 0.15);
+            e.orientation = C.Transforms.headingPitchRollQuaternion(
+              position(o.points[0]),
+              new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
+            );
+            e.model = model(
+              customUri,
+              o.scale,
+              props.opacity[o.kind],
+              selected,
+              32,
+              C.Color.WHITE,
+              0,
+            );
+          } else if (useHouseModel) {
             e.position = position(o.points[0], o.elevation + 0.2);
             e.orientation = C.Transforms.headingPitchRollQuaternion(
               position(o.points[0]),
@@ -465,6 +506,61 @@ export function Viewport(props: Props) {
                 ),
               ),
             });
+            if (isMosque) {
+              const opacity = props.opacity[o.kind];
+              v.entities.add({
+                id: `${o.id}:dome`,
+                position: position(
+                  o.points[0],
+                  o.elevation + o.floors * o.floorHeight + 2.6,
+                ),
+                ellipsoid: {
+                  radii: new C.Cartesian3(
+                    o.width * 0.28 * o.scale,
+                    o.depth * 0.28 * o.scale,
+                    3.2 * o.scale,
+                  ),
+                  maximumCone: Math.PI / 2,
+                  material:
+                    C.Color.fromCssColorString("#2d9b68").withAlpha(opacity),
+                },
+              });
+              const angle = (o.rotation * Math.PI) / 180;
+              const minaretPoint: Point = [
+                o.points[0][0] +
+                  Math.cos(angle) * o.width * 0.42 -
+                  Math.sin(angle) * o.depth * 0.38,
+                o.points[0][1] +
+                  Math.sin(angle) * o.width * 0.42 +
+                  Math.cos(angle) * o.depth * 0.38,
+              ];
+              v.entities.add({
+                id: `${o.id}:minaret`,
+                position: position(
+                  minaretPoint,
+                  o.elevation + o.floors * o.floorHeight * 0.9,
+                ),
+                cylinder: {
+                  length: o.floors * o.floorHeight * 1.8,
+                  topRadius: 0.65 * o.scale,
+                  bottomRadius: 1.15 * o.scale,
+                  material:
+                    C.Color.fromCssColorString("#f4f0df").withAlpha(opacity),
+                },
+              });
+              v.entities.add({
+                id: `${o.id}:minaret-cap`,
+                position: position(
+                  minaretPoint,
+                  o.elevation + o.floors * o.floorHeight * 1.82,
+                ),
+                ellipsoid: {
+                  radii: new C.Cartesian3(1.2, 1.2, 1.5),
+                  material:
+                    C.Color.fromCssColorString("#2d9b68").withAlpha(opacity),
+                },
+              });
+            }
           }
           const buildingOrientation = C.Transforms.headingPitchRollQuaternion(
             position(o.points[0]),
@@ -472,7 +568,7 @@ export function Viewport(props: Props) {
           );
           for (
             let floor = 0;
-            !useHouseModel && floor < Math.min(o.floors, 12);
+            !useHouseModel && !customUri && floor < Math.min(o.floors, 12);
             floor++
           )
             v.entities.add({
@@ -493,7 +589,12 @@ export function Viewport(props: Props) {
                 ),
               },
             });
-          if (!useHouseModel && o.roof === "pitched") {
+          if (
+            !useHouseModel &&
+            !customUri &&
+            !isMosque &&
+            o.roof === "pitched"
+          ) {
             const ring = footprint(o),
               center = position(
                 o.points[0],
@@ -898,6 +999,7 @@ export function Viewport(props: Props) {
     props.selected,
     props.draft,
     props.navigationMode,
+    assetVersion,
   ]);
   useEffect(() => {
     const v = viewer.current;
