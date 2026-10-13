@@ -32,20 +32,32 @@ describe("metric geometry and project commands", () => {
     expect(resized.scale).toBe(2);
     expect(resized.points[0]).toEqual([10, 10]);
   });
-  it("migrates schema v1 projects to v2 without changing design objects", () => {
+  it("migrates schema v1 projects to v3 without changing design objects", () => {
     const current = demoProject();
     const legacy = {
       ...current,
       schemaVersion: 1,
       dataLayers: undefined,
       designLayers: undefined,
+      projectLayers: undefined,
     };
     delete (legacy as { dataLayers?: unknown }).dataLayers;
     delete (legacy as { designLayers?: unknown }).designLayers;
+    delete (legacy as { projectLayers?: unknown }).projectLayers;
     const migrated = validateProject(legacy);
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(3);
     expect(migrated.objects).toEqual(current.objects);
     expect(migrated.dataLayers).toEqual([]);
+    expect(migrated.projectLayers).toEqual([]);
+  });
+  it("migrates schema v2 projects with an empty project-layer list", () => {
+    const current = demoProject();
+    const previous = { ...current, schemaVersion: 2 } as Record<string, unknown>;
+    delete previous.projectLayers;
+    const migrated = validateProject(previous);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.objects).toEqual(current.objects);
+    expect(migrated.projectLayers).toEqual([]);
   });
   it("rejects road surfaces that escape a concave boundary despite inside endpoints", () => {
     const p = newProject();

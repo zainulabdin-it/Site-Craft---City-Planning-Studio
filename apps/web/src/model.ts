@@ -76,6 +76,31 @@ export const designLayerSchema = z.object({
   visible: z.boolean(),
   opacity: z.number().min(0).max(1),
 });
+export const projectLayerSchema = z.object({
+  id: z.string().uuid(),
+  sourceProjectId: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  origin: z.tuple([z.number().min(165).max(179), z.number().min(-48).max(-34)]),
+  visible: z.boolean(),
+  opacity: z.number().min(0).max(1),
+  locked: z.boolean(),
+  objects: z.array(objectSchema).max(2000),
+  designLayers: z.array(designLayerSchema).length(8).default(() =>
+    (
+      [
+        "boundary",
+        "road",
+        "building",
+        "plot",
+        "tree",
+        "car",
+        "bench",
+        "bridge",
+      ] as const
+    ).map((kind) => ({ kind, visible: true, opacity: 1 })),
+  ),
+});
+export type ProjectLayer = z.infer<typeof projectLayerSchema>;
 const projectFields = {
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
@@ -95,12 +120,21 @@ export const legacyProjectSchema = z
     ...projectFields,
   })
   .strict();
-export const projectSchema = z
+export const projectV2Schema = z
   .object({
     schemaVersion: z.literal(2),
     ...projectFields,
     dataLayers: z.array(dataLayerSchema).max(100),
     designLayers: z.array(designLayerSchema).length(8),
+  })
+  .strict();
+export const projectSchema = z
+  .object({
+    schemaVersion: z.literal(3),
+    ...projectFields,
+    dataLayers: z.array(dataLayerSchema).max(100),
+    designLayers: z.array(designLayerSchema).length(8),
+    projectLayers: z.array(projectLayerSchema).max(20),
   })
   .strict();
 export type Project = z.infer<typeof projectSchema>;
@@ -117,7 +151,7 @@ export const kinds: Kind[] = [
 ];
 export function newProject(name = "Untitled Christchurch site"): Project {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: crypto.randomUUID(),
     name,
     revision: 0,
@@ -129,6 +163,7 @@ export function newProject(name = "Untitled Christchurch site"): Project {
     objects: [],
     dataLayers: [],
     designLayers: kinds.map((kind) => ({ kind, visible: true, opacity: 1 })),
+    projectLayers: [],
   };
 }
 export function newObject(

@@ -8,6 +8,7 @@ import {
   type Project,
   type DesignObject,
   projectSchema,
+  projectV2Schema,
   legacyProjectSchema,
 } from "./model";
 proj4.defs(
@@ -153,11 +154,11 @@ export function resizeFromHandle(
 }
 export function validateProject(input: unknown): Project {
   const version = (input as { schemaVersion?: unknown })?.schemaVersion;
-  const p =
+  const migrated =
     version === 1
-      ? projectSchema.parse({
+      ? {
           ...legacyProjectSchema.parse(input),
-          schemaVersion: 2,
+          schemaVersion: 3 as const,
           dataLayers: [],
           designLayers: [
             "boundary",
@@ -169,8 +170,16 @@ export function validateProject(input: unknown): Project {
             "bench",
             "bridge",
           ].map((kind) => ({ kind, visible: true, opacity: 1 })),
-        })
-      : projectSchema.parse(input);
+          projectLayers: [],
+        }
+      : version === 2
+        ? {
+            ...projectV2Schema.parse(input),
+            schemaVersion: 3 as const,
+            projectLayers: [],
+          }
+        : input;
+  const p = projectSchema.parse(migrated);
   const ids = new Set<string>(),
     nodes = new Map<string, string>();
   const bounds = p.objects.filter((o) => o.kind === "boundary");
