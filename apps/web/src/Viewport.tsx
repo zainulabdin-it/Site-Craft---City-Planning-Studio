@@ -685,6 +685,7 @@ export function Viewport(props: Props) {
                   o.elevation + o.floors * o.floorHeight + 5.5,
                 ),
                 label: {
+                  show: props.viewMode !== "street",
                   text: o.name,
                   font: "600 14px sans-serif",
                   fillColor: C.Color.fromCssColorString("#172b4d"),
@@ -1487,21 +1488,68 @@ export function Viewport(props: Props) {
       const roads = props.project.objects.filter(
           (object) => object.kind === "road" && object.points.length > 1,
         ),
-        road =
-          roads.find((object) =>
-            object.name.toLowerCase().includes("garden"),
-          ) || roads[0],
-        start = road?.points[0] || ([0, -120] as Point),
-        end = road?.points[1] || ([0, 0] as Point),
+        obstacles = props.project.objects.filter((object) =>
+          ["building", "bridge"].includes(object.kind),
+        ),
+        candidates = roads.flatMap((road) =>
+          road.points.slice(0, -1).flatMap((start, index) => {
+            const end = road.points[index + 1],
+              segmentLength = Math.hypot(
+                end[0] - start[0],
+                end[1] - start[1],
+              );
+            if (segmentLength < 18) return [];
+            return [0.35, 0.5, 0.65].map((fraction) => {
+              const eye: Point = [
+                  start[0] + (end[0] - start[0]) * fraction,
+                  start[1] + (end[1] - start[1]) * fraction,
+                ],
+                clearance = obstacles.length
+                  ? Math.min(
+                      ...obstacles.map((object) => {
+                        const center = object.points[0],
+                          radius = Math.hypot(object.width, object.depth) / 2;
+                        return (
+                          Math.hypot(eye[0] - center[0], eye[1] - center[1]) -
+                          radius
+                        );
+                      }),
+                    )
+                  : 100,
+                preferredRoad = /main|boulevard|avenue|collector/i.test(
+                  road.name,
+                )
+                  ? 35
+                  : 0;
+              return {
+                road,
+                start,
+                end,
+                eye,
+                score:
+                  Math.min(clearance, 80) +
+                  Math.min(segmentLength, 120) * 0.2 +
+                  preferredRoad +
+                  road.width,
+              };
+            });
+          }),
+        ),
+        safest = candidates.sort((a, b) => b.score - a.score)[0],
+        road = safest?.road || roads[0],
+        start = safest?.start || road?.points[0] || ([0, -120] as Point),
+        end = safest?.end || road?.points[1] || ([0, 0] as Point),
         direction: Point = [end[0] - start[0], end[1] - start[1]],
         distance = Math.hypot(direction[0], direction[1]) || 1,
-        eye: Point = [
-          start[0] + (direction[0] / distance) * 6,
-          start[1] + (direction[1] / distance) * 6,
-        ],
+        eye: Point =
+          safest?.eye ||
+          ([
+            start[0] + (direction[0] / distance) * 6,
+            start[1] + (direction[1] / distance) * 6,
+          ] as Point),
         ll = toGeo(eye, props.project.origin);
       v.camera.flyTo({
-        destination: C.Cartesian3.fromDegrees(...ll, 3.2),
+        destination: C.Cartesian3.fromDegrees(...ll, (road?.elevation ?? 0) + 2.2),
         orientation: {
           heading: Math.atan2(direction[0], direction[1]),
           pitch: -0.04,

@@ -83,6 +83,93 @@ import {
   type SocietyAssetCategory,
 } from "./societyAssets";
 import { analyzeSite, type SiteAnalysis } from "./siteAnalysis";
+
+type ShapeChoice = { value: string; label: string; preview: string };
+const quickLocations: Array<{
+  id: string;
+  name: string;
+  center: [number, number];
+}> = [
+  { id: "auckland", name: "Auckland", center: [174.7633, -36.8485] },
+  { id: "wellington", name: "Wellington", center: [174.7762, -41.2866] },
+  { id: "christchurch", name: "Christchurch", center: [172.6362, -43.5321] },
+  { id: "hamilton", name: "Hamilton", center: [175.2793, -37.787] },
+  { id: "tauranga", name: "Tauranga", center: [176.1651, -37.6878] },
+  { id: "dunedin", name: "Dunedin", center: [170.5028, -45.8788] },
+  { id: "queenstown", name: "Queenstown", center: [168.6626, -45.0312] },
+  { id: "rolleston", name: "Rolleston", center: [172.3847, -43.5907] },
+];
+const shapeChoices = (object: DesignObject): ShapeChoice[] => {
+  const choices: Partial<Record<Kind, ShapeChoice[]>> = {
+    building: [
+      { value: "kenney:house:a", label: "Classic", preview: "house-a" },
+      { value: "kenney:house:f", label: "Family", preview: "house-f" },
+      { value: "kenney:house:k", label: "Modern", preview: "house-k" },
+      { value: "kenney:house:t", label: "Townhouse", preview: "house-t" },
+    ],
+    tree: [
+      {
+        value: "builtin:tree:large",
+        label: "Broadleaf",
+        preview: "tree-large",
+      },
+      { value: "builtin:tree:small", label: "Small", preview: "tree-small" },
+      { value: "builtin:tree:palm", label: "Palm", preview: "tree-palm" },
+      {
+        value: "builtin:tree:columnar",
+        label: "Columnar",
+        preview: "tree-columnar",
+      },
+    ],
+    car: [
+      { value: "kenney:car:sedan", label: "Sedan", preview: "car-sedan" },
+      { value: "kenney:car:suv", label: "SUV", preview: "car-suv" },
+      { value: "kenney:car:van", label: "Van", preview: "car-van" },
+    ],
+    bench: [
+      {
+        value: "builtin:bench:classic",
+        label: "Classic",
+        preview: "bench-classic",
+      },
+      {
+        value: "builtin:bench:modern",
+        label: "Modern",
+        preview: "bench-modern",
+      },
+      { value: "builtin:bench:wood", label: "Wood", preview: "bench-wood" },
+    ],
+    bridge: [
+      {
+        value: "builtin:bridge:suspension",
+        label: "Suspension",
+        preview: "bridge-suspension",
+      },
+      { value: "builtin:bridge:arch", label: "Arch", preview: "bridge-arch" },
+      {
+        value: "builtin:bridge:truss",
+        label: "Truss",
+        preview: "bridge-truss",
+      },
+    ],
+  };
+  const available = choices[object.kind] ?? [];
+  if (
+    object.assetRef &&
+    !available.some((choice) => choice.value === object.assetRef)
+  )
+    return [
+      {
+        value: object.assetRef,
+        label: object.assetRef.startsWith("custom:")
+          ? "Imported model"
+          : "Selected asset",
+        preview: "custom-asset",
+      },
+      ...available,
+    ];
+  return available;
+};
 function initial() {
   try {
     const all = listLocal();
@@ -298,7 +385,10 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).matches("input,textarea,select")) return;
-      if (e.key === "Escape") cancel();
+      if (e.key === "Escape") {
+        setActiveMenu(null);
+        cancel();
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         history(!e.shiftKey);
@@ -316,6 +406,16 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  useEffect(() => {
+    if (!activeMenu) return;
+    const closeMenu = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && !target.closest(".top-nav"))
+        setActiveMenu(null);
+    };
+    document.addEventListener("pointerdown", closeMenu);
+    return () => document.removeEventListener("pointerdown", closeMenu);
+  }, [activeMenu]);
   const confirmPlacement = () => {
     if (!placementDialog) return;
     const o = placementDialog.object,
@@ -449,6 +549,17 @@ export default function App() {
       return;
     }
     const o = newObject(project, tool as Kind, [p]);
+    if (o.assetRef.endsWith(":v1"))
+      o.assetRef =
+        o.kind === "tree"
+          ? "builtin:tree:large"
+          : o.kind === "car"
+            ? "kenney:car:sedan"
+            : o.kind === "bench"
+              ? "builtin:bench:classic"
+              : o.kind === "bridge"
+                ? "builtin:bridge:suspension"
+                : o.assetRef;
     setPlacementDialog({ object: o, command: `Place ${tool}` });
   };
   const updateConnected = (o: DesignObject) => {
@@ -654,6 +765,41 @@ export default function App() {
       seq: Date.now(),
     });
   };
+  const jumpToLocation = (value: string) => {
+    if (!value) return;
+    if (value === "project") {
+      frame(undefined, "top");
+      return;
+    }
+    if (value.startsWith("site:")) {
+      frame(value.slice(5), "top");
+      return;
+    }
+    if (value.startsWith("place:")) {
+      const id = value.slice(6),
+        object = project.objects.find((item) => item.id === id);
+      frame(id, object?.kind === "building" ? "perspective" : "top");
+      return;
+    }
+    const location = quickLocations.find((item) => item.id === value);
+    if (!location) return;
+    const [longitude, latitude] = location.center;
+    setLocationQuery(location.name);
+    setLocationResults([]);
+    setAction({
+      type: "location",
+      location: {
+        center: location.center,
+        bounds: [
+          longitude - 0.045,
+          latitude - 0.032,
+          longitude + 0.045,
+          latitude + 0.032,
+        ],
+      },
+      seq: Date.now(),
+    });
+  };
   const openComputerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const f = e.target.files?.[0];
@@ -729,6 +875,28 @@ export default function App() {
       ),
     [project.projectLayers],
   );
+  const internalLocations = useMemo(() => {
+    const destinationName =
+        /park|mosque|church|temple|gurdwara|school|nursery|hospital|clinic|pharmacy|commercial|market|shop|supermarket|plaza|office|community centre|library|graveyard|cemetery|police|fire station|playground|sports field|parking/i,
+      mainRoadName = /entrance|access|gate|main boulevard|main avenue/i,
+      seen = new Set<string>();
+    return project.objects
+      .filter(
+        (object) =>
+          (object.kind === "road" && mainRoadName.test(object.name)) ||
+          (["building", "plot"].includes(object.kind) &&
+            destinationName.test(object.name)),
+      )
+      .filter((object) => {
+        const name = object.name.trim().toLowerCase();
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 50);
+  }, [project.objects]);
+
   return (
     <div className="app">
       <header>
@@ -908,6 +1076,44 @@ export default function App() {
           <span className="pill">
             <span className="live-dot" /> CONCEPT DESIGN
           </span>
+          <label className="location-jump" title="Move the map to another location">
+            <MapPin size={14} />
+            <select
+              aria-label="Move to location"
+              value=""
+              onChange={(event) => jumpToLocation(event.target.value)}
+            >
+              <option value="">Move to location</option>
+              <option value="project">Current project</option>
+              {project.objects.some((object) => object.kind === "boundary") && (
+                <optgroup label="Project sites">
+                  {project.objects
+                    .filter((object) => object.kind === "boundary")
+                    .map((boundary, index) => (
+                      <option key={boundary.id} value={`site:${boundary.id}`}>
+                        {boundary.name || `Site ${index + 1}`}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              {internalLocations.length > 0 && (
+                <optgroup label="Inside current site">
+                  {internalLocations.map((location) => (
+                    <option key={location.id} value={`place:${location.id}`}>
+                      {location.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="New Zealand cities">
+                {quickLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
           <form className="location-search" onSubmit={searchMap}>
             <label>
               <Search size={15} />
@@ -2187,7 +2393,10 @@ export default function App() {
       </footer>
       {dialog && (
         <div className="modal-backdrop">
-          <section role="dialog" className="modal">
+          <section
+            role="dialog"
+            className={`modal ${dialog === "confirm-switch" ? "confirm-switch-modal" : ""}`}
+          >
             <div className="modal-header">
               <div>
                 <h2>
@@ -2228,7 +2437,7 @@ export default function App() {
             </div>
             {dialog === "confirm-switch" ? (
               <>
-                <div className="modal-actions">
+                <div className="modal-actions confirm-switch-actions">
                   <button
                     className="primary"
                     onClick={async () => {
@@ -2401,63 +2610,38 @@ export default function App() {
               {["building", "tree", "car", "bench", "bridge"].includes(
                 placementDialog.object.kind,
               ) && (
-                <label className="field wide">
-                  Design / shape
-                  <select
-                    value={placementDialog.object.assetRef}
-                    onChange={(event) =>
-                      updatePlacementObject({ assetRef: event.target.value })
-                    }
-                  >
-                    {placementDialog.object.assetRef &&
-                      !placementDialog.object.assetRef.startsWith(
-                        "kenney:",
-                      ) && (
-                        <option value={placementDialog.object.assetRef}>
-                          Selected asset
-                        </option>
-                      )}
-                    {placementDialog.object.kind === "building" && (
-                      <>
-                        <option value="kenney:house:a">House A</option>
-                        <option value="kenney:house:f">House F</option>
-                        <option value="kenney:house:k">House K</option>
-                        <option value="kenney:house:t">House T</option>
-                      </>
-                    )}
-                    {placementDialog.object.kind === "tree" && (
-                      <>
-                        <option value="builtin:tree:large">Large tree</option>
-                        <option value="builtin:tree:small">Small tree</option>
-                        <option value="builtin:tree:palm">Palm</option>
-                        <option value="builtin:tree:columnar">Columnar</option>
-                      </>
-                    )}
-                    {placementDialog.object.kind === "car" && (
-                      <>
-                        <option value="kenney:car:sedan">Sedan</option>
-                        <option value="kenney:car:suv">SUV</option>
-                        <option value="kenney:car:van">Van</option>
-                      </>
-                    )}
-                    {placementDialog.object.kind === "bench" && (
-                      <>
-                        <option value="builtin:bench:classic">Classic</option>
-                        <option value="builtin:bench:modern">Modern</option>
-                        <option value="builtin:bench:wood">Wood</option>
-                      </>
-                    )}
-                    {placementDialog.object.kind === "bridge" && (
-                      <>
-                        <option value="builtin:bridge:suspension">
-                          Suspension
-                        </option>
-                        <option value="builtin:bridge:arch">Arch</option>
-                        <option value="builtin:bridge:truss">Truss</option>
-                      </>
-                    )}
-                  </select>
-                </label>
+                <fieldset className="shape-picker wide">
+                  <legend>Choose design / shape</legend>
+                  <div className="shape-choice-grid">
+                    {shapeChoices(placementDialog.object).map((choice) => (
+                      <button
+                        type="button"
+                        key={choice.value}
+                        className={
+                          placementDialog.object.assetRef === choice.value
+                            ? "shape-choice active"
+                            : "shape-choice"
+                        }
+                        aria-pressed={
+                          placementDialog.object.assetRef === choice.value
+                        }
+                        onClick={() =>
+                          updatePlacementObject({ assetRef: choice.value })
+                        }
+                      >
+                        <span
+                          className={`shape-preview ${choice.preview}`}
+                          aria-hidden="true"
+                        >
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                        <b>{choice.label}</b>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
               )}
               {["building", "bridge"].includes(placementDialog.object.kind) && (
                 <>
