@@ -552,7 +552,10 @@ export function Viewport(props: Props) {
           if (
             !is2D &&
             o.kind === "plot" &&
-            o.assetRef === "builtin:society:playground"
+            [
+              "builtin:society:playground",
+              "builtin:society:theme-park",
+            ].includes(o.assetRef)
           ) {
             const center: Point = [
               o.points.reduce((sum, point) => sum + point[0], 0) /
@@ -560,25 +563,67 @@ export function Viewport(props: Props) {
               o.points.reduce((sum, point) => sum + point[1], 0) /
                 o.points.length,
             ];
-            [
-              [-7, 0, "#e84c3d"],
-              [0, 4, "#2f80ed"],
-              [7, -2, "#f2c94c"],
-            ].forEach(([dx, dy, shade], index) =>
+            if (o.assetRef === "builtin:society:theme-park") {
               v.entities.add({
-                id: `${o.id}:play-${index}`,
-                position: position(
-                  [center[0] + Number(dx), center[1] + Number(dy)],
-                  o.elevation + 1.4,
-                ),
-                box: {
-                  dimensions: new C.Cartesian3(4, 3, 2.4),
-                  material: C.Color.fromCssColorString(String(shade)).withAlpha(
+                id: `${o.id}:carousel`,
+                position: position(center, o.elevation + 1.1),
+                cylinder: {
+                  length: 2.2,
+                  topRadius: 7,
+                  bottomRadius: 7,
+                  material: C.Color.fromCssColorString("#e85d75").withAlpha(
                     objectOpacity(o),
                   ),
                 },
-              }),
-            );
+              });
+              v.entities.add({
+                id: `${o.id}:carousel-roof`,
+                position: position(center, o.elevation + 4.1),
+                cylinder: {
+                  length: 3.8,
+                  topRadius: 0.5,
+                  bottomRadius: 8.2,
+                  material: C.Color.fromCssColorString("#f6c453").withAlpha(
+                    objectOpacity(o),
+                  ),
+                },
+              });
+              [-12, 12].forEach((dx, index) =>
+                v.entities.add({
+                  id: `${o.id}:ride-${index}`,
+                  position: position(
+                    [center[0] + dx, center[1] + (index ? 8 : -8)],
+                    o.elevation + 3.2,
+                  ),
+                  ellipsoid: {
+                    radii: new C.Cartesian3(4.5, 4.5, 3.2),
+                    material: C.Color.fromCssColorString(
+                      index ? "#3b82f6" : "#8b5cf6",
+                    ).withAlpha(objectOpacity(o)),
+                  },
+                }),
+              );
+            } else {
+              [
+                [-7, 0, "#e84c3d"],
+                [0, 4, "#2f80ed"],
+                [7, -2, "#f2c94c"],
+              ].forEach(([dx, dy, shade], index) =>
+                v.entities.add({
+                  id: `${o.id}:play-${index}`,
+                  position: position(
+                    [center[0] + Number(dx), center[1] + Number(dy)],
+                    o.elevation + 1.4,
+                  ),
+                  box: {
+                    dimensions: new C.Cartesian3(4, 3, 2.4),
+                    material: C.Color.fromCssColorString(
+                      String(shade),
+                    ).withAlpha(objectOpacity(o)),
+                  },
+                }),
+              );
+            }
           }
         } else if (o.kind === "road") {
           e.polyline = {
@@ -595,6 +640,15 @@ export function Viewport(props: Props) {
         } else if (o.kind === "building") {
           const customUri = getCustomAssetUrlSync(o.assetRef);
           const isMosque = o.assetRef === "builtin:society:mosque";
+          const facility = o.assetRef.startsWith("builtin:society:")
+            ? o.assetRef.split(":").at(-1) || "facility"
+            : "";
+          const useFacilityGeometry = [
+            "gazebo",
+            "gate",
+            "water-tank",
+            "transformer",
+          ].includes(facility);
           const useHouseModel =
             !customUri &&
             !isMosque &&
@@ -711,6 +765,103 @@ export function Viewport(props: Props) {
                 },
               }),
             );
+          } else if (facility === "gazebo") {
+            e.position = position(
+              o.points[0],
+              o.elevation + o.floors * o.floorHeight + 1.2,
+            );
+            e.cylinder = {
+              length: 2.4,
+              topRadius: 0,
+              bottomRadius: Math.min(o.width, o.depth) * 0.58,
+              material: C.Color.fromCssColorString("#6f5138").withAlpha(
+                objectOpacity(o),
+              ),
+            };
+            const gazeboRadius = Math.min(o.width, o.depth) * 0.38;
+            for (let post = 0; post < 8; post++) {
+              const theta = (post / 8) * Math.PI * 2,
+                postPoint: Point = [
+                  o.points[0][0] + Math.cos(theta) * gazeboRadius,
+                  o.points[0][1] + Math.sin(theta) * gazeboRadius,
+                ];
+              v.entities.add({
+                id: `${o.id}:post-${post}`,
+                position: position(
+                  postPoint,
+                  o.elevation + (o.floors * o.floorHeight) / 2,
+                ),
+                cylinder: {
+                  length: o.floors * o.floorHeight,
+                  topRadius: 0.18,
+                  bottomRadius: 0.22,
+                  material: C.Color.fromCssColorString("#e8ddc7").withAlpha(
+                    objectOpacity(o),
+                  ),
+                },
+              });
+            }
+          } else if (facility === "gate") {
+            const orientation = C.Transforms.headingPitchRollQuaternion(
+              position(o.points[0]),
+              new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
+            );
+            e.position = position(o.points[0], o.elevation + 5.4);
+            e.orientation = orientation;
+            e.box = {
+              dimensions: new C.Cartesian3(o.width * 0.72, 1.4, 1.1),
+              material: C.Color.fromCssColorString("#d7c09d").withAlpha(
+                objectOpacity(o),
+              ),
+            };
+            const angle = (o.rotation * Math.PI) / 180;
+            [-1, 1].forEach((side) => {
+              const pillar: Point = [
+                o.points[0][0] + Math.cos(angle) * o.width * 0.41 * side,
+                o.points[0][1] + Math.sin(angle) * o.width * 0.41 * side,
+              ];
+              v.entities.add({
+                id: `${o.id}:pillar-${side}`,
+                position: position(pillar, o.elevation + 3.1),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(2.4, o.depth, 6.2),
+                  material: C.Color.fromCssColorString("#c7ad84").withAlpha(
+                    objectOpacity(o),
+                  ),
+                },
+              });
+            });
+          } else if (facility === "water-tank") {
+            e.position = position(o.points[0], o.elevation + 8);
+            e.cylinder = {
+              length: 12,
+              topRadius: Math.min(o.width, o.depth) * 0.35,
+              bottomRadius: Math.min(o.width, o.depth) * 0.35,
+              material: C.Color.fromCssColorString("#79abc5").withAlpha(
+                objectOpacity(o),
+              ),
+            };
+            v.entities.add({
+              id: `${o.id}:tank-base`,
+              position: position(o.points[0], o.elevation + 1.5),
+              cylinder: {
+                length: 3,
+                topRadius: Math.min(o.width, o.depth) * 0.22,
+                bottomRadius: Math.min(o.width, o.depth) * 0.3,
+                material: C.Color.fromCssColorString("#6f7d83").withAlpha(
+                  objectOpacity(o),
+                ),
+              },
+            });
+          } else if (facility === "transformer") {
+            e.position = position(o.points[0], o.elevation + 2.2);
+            e.box = {
+              dimensions: new C.Cartesian3(o.width * 0.7, o.depth * 0.7, 4.4),
+              material: C.Color.fromCssColorString("#75858d").withAlpha(
+                objectOpacity(o),
+              ),
+            };
           } else {
             e.polygon = polygon(
               footprint(o),
@@ -788,7 +939,6 @@ export function Viewport(props: Props) {
               });
             }
             if (o.assetRef.startsWith("builtin:society:")) {
-              const facility = o.assetRef.split(":").at(-1) || "facility";
               v.entities.add({
                 id: `${o.id}:label`,
                 position: position(
@@ -843,16 +993,30 @@ export function Viewport(props: Props) {
                     o.points[0],
                     o.elevation + o.floors * o.floorHeight + 2.2,
                   ),
-                  ellipsoid: {
-                    radii: new C.Cartesian3(
-                      o.width * 0.22,
-                      o.depth * 0.22,
-                      facility === "church" ? 4.5 : 2.5,
-                    ),
-                    material: C.Color.fromCssColorString(
-                      facility === "temple" ? "#d97706" : "#e8dcc5",
-                    ).withAlpha(objectOpacity(o)),
-                  },
+                  ...(facility === "church"
+                    ? {
+                        cylinder: {
+                          length: 8,
+                          topRadius: 0,
+                          bottomRadius: Math.min(o.width, o.depth) * 0.18,
+                          material: C.Color.fromCssColorString(
+                            "#66594c",
+                          ).withAlpha(objectOpacity(o)),
+                        },
+                      }
+                    : {
+                        ellipsoid: {
+                          radii: new C.Cartesian3(
+                            o.width * 0.22,
+                            o.depth * 0.22,
+                            2.5,
+                          ),
+                          maximumCone: Math.PI / 2,
+                          material: C.Color.fromCssColorString(
+                            facility === "temple" ? "#d97706" : "#d6b65d",
+                          ).withAlpha(objectOpacity(o)),
+                        },
+                      }),
                 });
               }
             }
@@ -861,29 +1025,93 @@ export function Viewport(props: Props) {
             position(o.points[0]),
             new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
           );
-          for (
-            let floor = 0;
-            !useHouseModel && !customUri && floor < Math.min(o.floors, 12);
-            floor++
-          )
+          if (!useHouseModel && !customUri && !useFacilityGeometry) {
+            const angle = (o.rotation * Math.PI) / 180,
+              localPoint = (across: number, forward: number): Point => [
+                o.points[0][0] +
+                  Math.cos(angle) * across -
+                  Math.sin(angle) * forward,
+                o.points[0][1] +
+                  Math.sin(angle) * across +
+                  Math.cos(angle) * forward,
+              ],
+              facadePalette: Record<string, string> = {
+                hospital: "#9bd8e5",
+                school: "#85b9d6",
+                office: "#75abc5",
+                supermarket: "#73b7ad",
+                police: "#82a7c4",
+                mosque: "#8fc5b5",
+                church: "#b3c5d0",
+                temple: "#d9b36c",
+                gurdwara: "#d7c17c",
+              },
+              glass = facadePalette[facility] || "#84b9d6",
+              columns = o.width >= 26 ? 5 : o.width >= 17 ? 4 : 3,
+              floors = Math.min(o.floors, 8),
+              panelWidth = (o.width * o.scale) / columns;
+            for (let floor = 0; floor < floors; floor++) {
+              for (let column = 0; column < columns; column++) {
+                const across =
+                  -o.width * o.scale * 0.5 + panelWidth * (column + 0.5);
+                v.entities.add({
+                  id: `${o.id}:window-${floor}-${column}`,
+                  position: position(
+                    localPoint(across, o.depth * o.scale * 0.5 + 0.08),
+                    o.elevation + floor * o.floorHeight + o.floorHeight * 0.58,
+                  ),
+                  orientation: buildingOrientation,
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      panelWidth * 0.66,
+                      0.16,
+                      Math.min(1.55, o.floorHeight * 0.46),
+                    ),
+                    material: C.Color.fromCssColorString(glass).withAlpha(
+                      objectOpacity(o) * 0.88,
+                    ),
+                  },
+                });
+              }
+            }
+            const entrance = localPoint(0, o.depth * o.scale * 0.5 + 0.14);
             v.entities.add({
-              id: `${o.id}:windows-${floor}`,
+              id: `${o.id}:entrance`,
               position: position(
-                o.points[0],
-                o.elevation + floor * o.floorHeight + o.floorHeight * 0.62,
+                entrance,
+                o.elevation + Math.min(1.5, o.floorHeight * 0.45),
               ),
               orientation: buildingOrientation,
               box: {
                 dimensions: new C.Cartesian3(
-                  o.width * o.scale + 0.08,
-                  o.depth * o.scale + 0.08,
-                  Math.min(0.55, o.floorHeight * 0.2),
+                  Math.min(4.2, o.width * 0.25),
+                  0.24,
+                  Math.min(3, o.floorHeight * 0.9),
                 ),
-                material: C.Color.fromCssColorString("#84b9d6").withAlpha(
-                  objectOpacity(o) * 0.78,
+                material: C.Color.fromCssColorString("#31566f").withAlpha(
+                  objectOpacity(o) * 0.92,
                 ),
               },
             });
+            v.entities.add({
+              id: `${o.id}:canopy`,
+              position: position(
+                localPoint(0, o.depth * o.scale * 0.5 + 1.1),
+                o.elevation + Math.min(3.2, o.floorHeight),
+              ),
+              orientation: buildingOrientation,
+              box: {
+                dimensions: new C.Cartesian3(
+                  Math.min(7, o.width * 0.4),
+                  2.2,
+                  0.22,
+                ),
+                material: C.Color.fromCssColorString("#e8e2d7").withAlpha(
+                  objectOpacity(o),
+                ),
+              },
+            });
+          }
           if (
             !useHouseModel &&
             !customUri &&

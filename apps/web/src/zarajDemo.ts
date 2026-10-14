@@ -300,6 +300,17 @@ export function zarajNzProject() {
     "Children playground",
     { color: "#e7b45d", assetRef: "builtin:society:playground" },
   );
+  add(
+    "plot",
+    [
+      [165, 295],
+      [235, 295],
+      [235, 345],
+      [165, 345],
+    ],
+    "Family theme park",
+    { color: "#d7b9e8", assetRef: "builtin:society:theme-park" },
+  );
   for (let i = 0; i < 46; i++) {
     const x = -255 + (i % 12) * 18,
       y = 195 + Math.floor(i / 12) * 38;
