@@ -1,0 +1,104 @@
+DAILY WORK LOG — SITECRAFT CITY PLANNING STUDIO
+Date: 12 October 2026
+Working Hours: 9:00 AM – 6:00 PM
+Break: 1:00 PM – 2:00 PM
+Total Active Working Time: 8 Hours
+
+STORY TITLE
+Enhance the City Planning Studio with realistic 3D design, interactive editing, complete site facilities, road connectivity and safe project management.
+
+USER STORY
+As a city planner, I want to create, inspect, customize, connect, save and reopen a realistic city proposal so that I can design a complete site with accurate object placement, practical access, public spaces, parking and clear 2D/3D visualization.
+
+
+TASK 1 — Interactive Object Editing and Accurate Placement
+Time: 9:00 AM – 10:30 AM (1 Hour 30 Minutes)
+
+- Improved visibility of houses, cars, trees and other planning objects.
+- Added individual house size and design customization.
+- Added hover details showing coordinates and object dimensions.
+- Added drag handles for resizing selected objects.
+- Added scale controls for cars, trees, benches and other point objects.
+- Ensured moved and resized objects remain at the correct map position.
+
+
+TASK 2 — Professional 3D Navigation and City Visualization
+Time: 10:30 AM – 1:00 PM (2 Hours 30 Minutes)
+
+- Added a Hand tool for safe 360-degree exploration.
+- Added dedicated 2D, 3D and Street view camera modes.
+- Improved scene lighting, sky, fog, colors and contrast.
+- Improved road surfaces and lane markings.
+- Corrected house, car and tree ground elevation.
+- Improved the street-level neighbourhood presentation.
+
+
+BREAK
+Time: 1:00 PM – 2:00 PM (1 Hour)
+
+
+TASK 3 — Realistic Multi-Material 3D Assets
+Time: 2:00 PM – 3:00 PM (1 Hour)
+
+- Restored missing Kenney texture assets.
+- Added separate colors for house walls, roofs, windows, doors and foundations.
+- Added detailed car body, glass, tyre and light colors.
+- Improved tree trunk and canopy color separation.
+- Rebuilt benches with wooden slats and metal frames.
+- Improved bridges with decks, rails, posts, piers and road markings.
+- Added a reusable water-wave material.
+
+
+TASK 4 — Complete Landscaped Community Park
+Time: 3:00 PM – 4:00 PM (1 Hour)
+
+- Added a park entrance plaza and connected walking paths.
+- Added visitor parking with four parked cars.
+- Added six benches and sixteen mixed trees.
+- Added a playground, flower garden, pond and pavilion.
+- Removed houses overlapping the park boundary.
+- Fixed water waves incorrectly covering the park.
+- Restored the intended water corridor below the bridge.
+
+
+TASK 5 — Safe Project Save and Load Workflow
+Time: 4:00 PM – 4:45 PM (45 Minutes)
+
+- Added “Computer file” as a save destination.
+- Added JSON project saving from the main Save Project button.
+- Preserved map origin, boundary, layers, dimensions and object coordinates.
+- Restored loaded projects at their exact original location.
+- Added an unsaved-work warning before switching projects.
+- Added Save Current & Open, Open Without Saving and Cancel options.
+- Added a warning when the loaded project uses the same site location.
+- Created and validated a saved Christchurch project draft.
+
+
+TASK 6 — Property-to-Road Access Network
+Time: 4:45 PM – 5:20 PM (35 Minutes)
+
+- Added individual driveways for fifteen houses.
+- Calculated driveway width according to house size.
+- Added access roads for the park, park parking, market and apartments.
+- Connected each entrance to the nearest main road.
+- Removed unnecessary centre lines from one-lane access roads.
+- Updated the saved project draft with the access network.
+
+
+TASK 7 — Commercial and Residential Parking
+Time: 5:20 PM – 6:00 PM (40 Minutes)
+
+- Added customer parking beside the neighbourhood market.
+- Added a separate market parking entrance and six parked cars.
+- Added resident parking beside the mixed-use apartment building.
+- Added a separate apartment parking entrance and eight parked cars.
+- Added visible white parking-bay markings.
+- Synced all parking objects with the saved computer project file.
+
+
+DAILY RESULT
+- One user story completed through 7 related implementation tasks.
+- Total active working time: 8 hours.
+- Automated tests: 16 passing.
+- Production build: Successful.
+- Completed code changes committed and pushed to GitHub.

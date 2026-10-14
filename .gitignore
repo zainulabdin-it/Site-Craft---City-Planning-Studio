@@ -10,5 +10,6 @@ storage/
 test-results/
 playwright-report/
 .asset-work/
+tmp/
 apps/web/public/cesium/
 *.tsbuildinfo
