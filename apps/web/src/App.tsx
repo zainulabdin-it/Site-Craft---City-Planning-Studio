@@ -10,6 +10,7 @@ import {
   Undo2,
   Redo2,
   Save,
+  Check,
   Download,
   Plus,
   Move,
@@ -877,8 +878,8 @@ export default function App() {
   );
   const internalLocations = useMemo(() => {
     const destinationName =
-        /park|mosque|church|temple|gurdwara|school|nursery|hospital|clinic|pharmacy|commercial|market|shop|supermarket|plaza|office|community centre|library|graveyard|cemetery|police|fire station|playground|sports field|parking/i,
-      mainRoadName = /entrance|access|gate|main boulevard|main avenue/i,
+        /mosque|church|temple|gurdwara|school|nursery|hospital|clinic|pharmacy|community (club|centre|center)|library|graveyard|cemetery|police|fire station|playground|sports field|main park|commercial (area|centre|center)|neighbourhood market|supermarket/i,
+      mainRoadName = /main boulevard|main avenue|park avenue|entrance road|access road|society gate/i,
       seen = new Set<string>();
     return project.objects
       .filter(
@@ -1174,9 +1175,23 @@ export default function App() {
         <button
           onClick={save}
           disabled={status === "Saving…"}
-          className="primary"
+          className={`primary save-project-button ${status === "Saved" ? "is-saved" : ""}`}
+          title={
+            status === "Saved"
+              ? "Project is saved"
+              : status === "Saving…"
+                ? "Saving project"
+                : "Save project"
+          }
         >
-          <Save size={15} /> Save project
+          {status === "Saved" ? <Check size={16} /> : <Save size={15} />}
+          <span>
+            {status === "Saving…"
+              ? "Saving…"
+              : status === "Saved"
+                ? "Saved"
+                : "Save project"}
+          </span>
         </button>
       </header>
       <div

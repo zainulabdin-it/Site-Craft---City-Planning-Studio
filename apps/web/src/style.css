@@ -2441,18 +2441,24 @@ header > .primary {
 .header-map-actions {
   flex: 1 1 auto;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
 }
 .location-jump {
+  height: 40px;
   flex: 0 1 210px;
   min-width: 170px;
   max-width: 210px;
+  padding-inline: 11px;
+  border-radius: 8px;
 }
 .header-map-actions .location-search {
+  height: 40px;
   flex: 1 1 360px;
   min-width: 240px;
   max-width: 420px;
+  border-radius: 8px;
 }
+.header-map-actions .location-search > button { border-radius: 0 7px 7px 0; }
 .header-map-actions .location-search label { flex: 1; min-width: 0; }
 .header-map-actions .location-search input { width: 100%; min-width: 0; }
 .header-map-actions .location-search > button {
@@ -2467,14 +2473,16 @@ header > .primary {
   overflow: hidden;
   white-space: nowrap;
 }
-@media (max-width: 1700px) {
-  .studio,
+@media (max-width: 2100px) {
   .project-title,
   .header-map-actions .pill { display: none; }
 }
-@media (max-width: 1500px) {
+@media (max-width: 1850px) {
   .save-state,
   .engine-picker { display: none; }
+}
+@media (max-width: 1650px) {
+  .studio { display: none; }
   .location-jump { flex-basis: 190px; max-width: 190px; }
   .header-map-actions .location-search { flex-basis: 320px; max-width: 360px; }
   .header-map-actions .return-project {
@@ -2484,7 +2492,7 @@ header > .primary {
   }
   .header-map-actions .return-project span { display: none; }
 }
-@media (max-width: 1150px) {
+@media (max-width: 1300px) {
   .location-jump,
   .header-map-actions .return-project { display: none; }
   .header-map-actions .location-search { max-width: none; }
@@ -2493,4 +2501,29 @@ header > .primary {
   header { gap: 8px; padding-inline: 10px; }
   header > .top-nav { padding-right: 4px; }
   .header-map-actions .location-search { display: none; }
+}
+
+button.primary:hover:not(:disabled),
+header > .save-project-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+header > .save-project-button {
+  min-width: 122px;
+  color: #fff;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+header > .save-project-button.is-saved {
+  color: #fff;
+  border-color: #0f766e;
+  background: #0f766e;
+  box-shadow: 0 0 0 3px #ccfbf140;
+}
+header > .save-project-button.is-saved:hover:not(:disabled) {
+  border-color: #115e59;
+  background: #115e59;
 }
