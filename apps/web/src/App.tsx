@@ -1152,7 +1152,7 @@ export default function App() {
             className="return-project"
             onClick={() => frame(undefined, "top")}
           >
-            <RotateCcw size={14} /> Return to project
+            <RotateCcw size={15} /> <span>Return to project</span>
           </button>
         </div>
         <span className={`save-state ${status === "Saved" ? "saved" : ""}`}>

@@ -275,7 +275,7 @@ export function Viewport(props: Props) {
         position: C.Cartesian3.fromDegrees(longitude, latitude, height),
         label: {
           text: `${object.name} · ${object.kind}\nLon ${longitude.toFixed(6)} · Lat ${latitude.toFixed(6)}\nE ${east.toFixed(1)} m · N ${north.toFixed(1)} m\n${dimensions}`,
-          font: "600 13px DM Sans, sans-serif",
+          font: "600 13px Inter, Segoe UI, sans-serif",
           fillColor: C.Color.WHITE,
           outlineColor: C.Color.fromCssColorString("#0f172a"),
           outlineWidth: 2,
