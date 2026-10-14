@@ -17,6 +17,12 @@ self.onmessage = ({ data }) => {
             width: road.width + 3.2,
           })),
         ),
+        curbs: roadSurface(
+          roads.map((road: { width: number }) => ({
+            ...road,
+            width: road.width + 0.7,
+          })),
+        ),
         polygons: roadSurface(roads),
       })),
     });

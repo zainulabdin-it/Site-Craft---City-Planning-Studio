@@ -223,7 +223,10 @@ export default function App() {
       boot.project.designLayers.map((layer) => layer.kind),
     ),
     [engine, setEngine] = useState("Cesium 3D"),
-    [viewMode, setViewMode] = useState<"2d" | "3d" | "street">("3d"),
+    [viewMode, setViewMode] = useState<"2d" | "3d" | "street">("2d"),
+    [navigationProfile, setNavigationProfile] = useState<
+      "walk" | "orbit" | "drone"
+    >("orbit"),
     [layersOpen, setLayersOpen] = useState(true),
     [currentProjectExpanded, setCurrentProjectExpanded] = useState(true),
     [expandedProjectLayers, setExpandedProjectLayers] = useState<Set<string>>(
@@ -338,7 +341,7 @@ export default function App() {
   };
   const frame = (id?: string, type: ViewAction["type"] = "frame") => {
     if (type === "top") setViewMode("2d");
-    else if (type === "perspective") setViewMode("3d");
+    else if (type === "perspective" || type === "drone") setViewMode("3d");
     else if (type === "street") setViewMode("street");
     setAction({ id, type, seq: Date.now() });
   };
@@ -402,6 +405,26 @@ export default function App() {
         e.preventDefault();
         setName("New Christchurch site");
         setDialog("new");
+      }
+      if (tool === "hand" && viewMode !== "2d") {
+        const key = e.key.toLowerCase();
+        const navigationKeys: Partial<Record<string, ViewAction["type"]>> = {
+          w: "move-forward",
+          s: "move-backward",
+          a: "strafe-left",
+          d: "strafe-right",
+          q: navigationProfile === "drone" ? "move-down" : "rotate-left",
+          e: navigationProfile === "drone" ? "move-up" : "rotate-right",
+          arrowleft: "rotate-left",
+          arrowright: "rotate-right",
+          arrowup: "tilt-up",
+          arrowdown: "tilt-down",
+        };
+        const type = navigationKeys[key];
+        if (type) {
+          e.preventDefault();
+          setAction({ type, seq: Date.now() });
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -879,7 +902,8 @@ export default function App() {
   const internalLocations = useMemo(() => {
     const destinationName =
         /mosque|church|temple|gurdwara|school|nursery|hospital|clinic|pharmacy|community (club|centre|center)|library|graveyard|cemetery|police|fire station|playground|sports field|main park|commercial (area|centre|center)|neighbourhood market|supermarket/i,
-      mainRoadName = /main boulevard|main avenue|park avenue|entrance road|access road|society gate/i,
+      mainRoadName =
+        /main boulevard|main avenue|park avenue|entrance road|access road|society gate/i,
       seen = new Set<string>();
     return project.objects
       .filter(
@@ -1077,7 +1101,10 @@ export default function App() {
           <span className="pill">
             <span className="live-dot" /> CONCEPT DESIGN
           </span>
-          <label className="location-jump" title="Move the map to another location">
+          <label
+            className="location-jump"
+            title="Move the map to another location"
+          >
             <MapPin size={14} />
             <select
               aria-label="Move to location"
@@ -1830,6 +1857,7 @@ export default function App() {
             onContext={setContext}
             action={action}
             navigationMode={tool === "hand"}
+            navigationProfile={navigationProfile}
             viewMode={viewMode}
           />
           <div className="map-top">
@@ -1895,7 +1923,11 @@ export default function App() {
               </button>
               <button
                 className={viewMode === "street" ? "active" : ""}
-                onClick={() => frame(undefined, "street")}
+                onClick={() => {
+                  setNavigationProfile("walk");
+                  setTool("hand");
+                  frame(undefined, "street");
+                }}
               >
                 Street
               </button>
@@ -2050,9 +2082,45 @@ export default function App() {
               <Minus size={16} />
             </button>
           </div>
-          {viewMode === "street" && (
-            <div className="street-controls" aria-label="Street view controls">
-              <span>LOOK</span>
+          {viewMode !== "2d" && (
+            <div
+              className="street-controls"
+              aria-label="3D navigation controls"
+            >
+              <div className="navigation-profiles" aria-label="Navigation mode">
+                <button
+                  className={navigationProfile === "walk" ? "active" : ""}
+                  onClick={() => {
+                    setNavigationProfile("walk");
+                    setTool("hand");
+                    if (viewMode !== "street") frame(undefined, "street");
+                  }}
+                >
+                  Walk
+                </button>
+                <button
+                  className={navigationProfile === "orbit" ? "active" : ""}
+                  onClick={() => {
+                    setNavigationProfile("orbit");
+                    setTool("hand");
+                  }}
+                >
+                  360°
+                </button>
+                <button
+                  className={navigationProfile === "drone" ? "active" : ""}
+                  onClick={() => {
+                    setNavigationProfile("drone");
+                    setTool("hand");
+                    frame(undefined, "drone");
+                  }}
+                >
+                  Drone
+                </button>
+              </div>
+              <span>
+                {navigationProfile === "drone" ? "FLY" : "MOVE & LOOK"}
+              </span>
               <div className="street-control-grid">
                 <button
                   aria-label="Tilt view up"
@@ -2108,8 +2176,59 @@ export default function App() {
                 >
                   ▼
                 </button>
+                <button
+                  aria-label="Move left"
+                  title="Move left"
+                  onClick={() =>
+                    setAction({ type: "strafe-left", seq: Date.now() })
+                  }
+                >
+                  ←
+                </button>
+                <button
+                  aria-label={
+                    navigationProfile === "drone" ? "Fly up" : "Look forward"
+                  }
+                  title={
+                    navigationProfile === "drone" ? "Fly up" : "Look forward"
+                  }
+                  onClick={() =>
+                    setAction({
+                      type:
+                        navigationProfile === "drone" ? "move-up" : "tilt-up",
+                      seq: Date.now(),
+                    })
+                  }
+                >
+                  {navigationProfile === "drone" ? "＋" : "•"}
+                </button>
+                <button
+                  aria-label="Move right"
+                  title="Move right"
+                  onClick={() =>
+                    setAction({ type: "strafe-right", seq: Date.now() })
+                  }
+                >
+                  →
+                </button>
               </div>
-              <small>5 m move · 12° turn</small>
+              {navigationProfile === "drone" && (
+                <button
+                  className="drone-down"
+                  onClick={() =>
+                    setAction({ type: "move-down", seq: Date.now() })
+                  }
+                >
+                  Lower drone
+                </button>
+              )}
+              <small>
+                {navigationProfile === "walk"
+                  ? "2 m step · WASD / arrows"
+                  : navigationProfile === "drone"
+                    ? "25 m step · WASD · Q/E height"
+                    : "Drag to explore 360°"}
+              </small>
             </div>
           )}
           {tool !== "select" && tool !== "hand" && (

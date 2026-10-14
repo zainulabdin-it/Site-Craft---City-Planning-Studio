@@ -7,13 +7,14 @@ import {
   type Kind,
   type DesignObject,
 } from "./model";
-import { toGeo, toLocal, footprint, area, length } from "./geometry";
+import { toGeo, toLocal, footprint, area, length, inside } from "./geometry";
 import { getCustomAssetUrlSync, hydrateCustomAssetUrls } from "./assetStorage";
 export type ViewAction = {
   type:
     | "frame"
     | "top"
     | "perspective"
+    | "drone"
     | "street"
     | "location"
     | "zoom-in"
@@ -23,7 +24,11 @@ export type ViewAction = {
     | "tilt-up"
     | "tilt-down"
     | "move-forward"
-    | "move-backward";
+    | "move-backward"
+    | "strafe-left"
+    | "strafe-right"
+    | "move-up"
+    | "move-down";
   id?: string;
   location?: {
     center: Point;
@@ -45,6 +50,7 @@ interface Props {
   action: ViewAction;
   onContext: (s: string) => void;
   navigationMode: boolean;
+  navigationProfile: "walk" | "orbit" | "drone";
   viewMode: "2d" | "3d" | "street";
 }
 export function Viewport(props: Props) {
@@ -97,20 +103,31 @@ export function Viewport(props: Props) {
         selectionIndicator: false,
         requestRenderMode: true,
         maximumRenderTimeChange: Number.POSITIVE_INFINITY,
-        targetFrameRate: 30,
-        shadows: true,
+        targetFrameRate: 45,
+        shadows: false,
       });
     } catch (e) {
       props.onError(`3D viewport could not start: ${String(e)}`);
       return;
     }
     viewer.current = v;
-    v.scene.shadowMap.softShadows = true;
-    v.scene.backgroundColor = C.Color.fromCssColorString("#8dccf3");
+    // Hundreds of objects can be visible in a society plan. Screen-space
+    // shading and per-object shadows are intentionally disabled in the
+    // interactive editor so camera movement remains responsive.
+    v.scene.shadowMap.softShadows = false;
+    v.scene.shadowMap.maximumDistance = 600;
+    v.scene.backgroundColor = C.Color.fromCssColorString("#b9d8ee");
     v.scene.highDynamicRange = true;
+    v.scene.postProcessStages.fxaa.enabled = true;
+    v.scene.light = new C.SunLight({ intensity: 2.15 });
+    if (v.scene.skyAtmosphere) {
+      v.scene.skyAtmosphere.hueShift = -0.035;
+      v.scene.skyAtmosphere.saturationShift = 0.08;
+      v.scene.skyAtmosphere.brightnessShift = 0.12;
+    }
     v.scene.fog.enabled = true;
-    v.scene.fog.density = 0.00018;
-    v.scene.globe.baseColor = C.Color.fromCssColorString("#e2e8dd");
+    v.scene.fog.density = 0.00012;
+    v.scene.globe.baseColor = C.Color.fromCssColorString("#dce7d2");
     v.scene.globe.depthTestAgainstTerrain = false;
     const provider = new C.OpenStreetMapImageryProvider({
       url: "https://tile.openstreetmap.org/",
@@ -128,13 +145,35 @@ export function Viewport(props: Props) {
     latest.current.onContext(
       "OpenStreetMap · flat ellipsoid (no elevation data)",
     );
+    const terrainUrl = import.meta.env.VITE_TERRAIN_URL;
     const token = import.meta.env.VITE_CESIUM_ION_TOKEN;
-    if (token) {
+    if (terrainUrl) {
+      C.CesiumTerrainProvider.fromUrl(terrainUrl, {
+        requestVertexNormals: true,
+        requestWaterMask: true,
+      })
+        .then((terrain) => {
+          if (!v.isDestroyed()) {
+            v.terrainProvider = terrain;
+            v.scene.globe.depthTestAgainstTerrain = true;
+            latest.current.onContext(
+              "Location terrain · real elevation and terrain-aware camera",
+            );
+            v.scene.requestRender();
+          }
+        })
+        .catch(() =>
+          latest.current.onError(
+            "Configured terrain could not load. Flat map fallback is active.",
+          ),
+        );
+    } else if (token) {
       C.Ion.defaultAccessToken = token;
       C.createWorldTerrainAsync()
         .then((t) => {
           if (!v.isDestroyed()) {
             v.terrainProvider = t;
+            v.scene.globe.depthTestAgainstTerrain = true;
             latest.current.onContext(
               "Cesium World Terrain · conceptual designs use ellipsoid offsets",
             );
@@ -318,6 +357,21 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    const presentation = props.viewMode !== "2d";
+    v.scene.highDynamicRange = presentation;
+    v.scene.fog.enabled = presentation;
+    v.scene.light = new C.SunLight({ intensity: presentation ? 2.15 : 1.25 });
+    v.scene.globe.enableLighting = presentation;
+    v.scene.globe.dynamicAtmosphereLighting = presentation;
+    v.scene.globe.dynamicAtmosphereLightingFromSun = presentation;
+    v.scene.postProcessStages.ambientOcclusion.enabled = false;
+    if (v.scene.skyAtmosphere)
+      v.scene.skyAtmosphere.brightnessShift = presentation ? 0.12 : 0;
+    v.scene.requestRender();
+  }, [props.viewMode]);
+  useEffect(() => {
+    const v = viewer.current;
+    if (!v) return;
     const p = props.project;
     const is2D = props.viewMode === "2d";
     if (modeCache.current !== props.viewMode) {
@@ -368,7 +422,7 @@ export function Viewport(props: Props) {
         ? C.Color.fromCssColorString("#f8b84b")
         : C.Color.TRANSPARENT,
       silhouetteSize: selected ? 3 : 0,
-      shadows: C.ShadowMode.ENABLED,
+      shadows: C.ShadowMode.DISABLED,
     });
     const alive = new Set(p.objects.map((o) => o.id));
     for (const id of cache.current.keys())
@@ -601,7 +655,61 @@ export function Viewport(props: Props) {
               selected,
               28,
               color,
-              0.34,
+              0.18,
+            );
+            const angle = (o.rotation * Math.PI) / 180;
+            const localPoint = (across: number, forward: number): Point => [
+              o.points[0][0] +
+                Math.cos(angle) * across -
+                Math.sin(angle) * forward,
+              o.points[0][1] +
+                Math.sin(angle) * across +
+                Math.cos(angle) * forward,
+            ];
+            const detailAlpha = objectOpacity(o);
+            v.entities.add({
+              id: `${o.id}:plinth`,
+              position: position(o.points[0], o.elevation + 0.12),
+              orientation: e.orientation as C.Quaternion,
+              box: {
+                dimensions: new C.Cartesian3(
+                  o.width * o.scale * 0.92,
+                  o.depth * o.scale * 0.9,
+                  0.24,
+                ),
+                material:
+                  C.Color.fromCssColorString("#d9d2c4").withAlpha(detailAlpha),
+              },
+            });
+            v.entities.add({
+              id: `${o.id}:driveway`,
+              polygon: polygon(
+                [
+                  localPoint(-2.2, o.depth * 0.34),
+                  localPoint(2.2, o.depth * 0.34),
+                  localPoint(2.2, o.depth * 0.78),
+                  localPoint(-2.2, o.depth * 0.78),
+                ],
+                o.elevation + 0.08,
+                0.05,
+                C.Color.fromCssColorString("#c9c5bb").withAlpha(detailAlpha),
+              ),
+            });
+            [-1, 1].forEach((side) =>
+              v.entities.add({
+                id: `${o.id}:front-shrub-${side}`,
+                position: position(
+                  localPoint(side * o.width * 0.33, o.depth * 0.42),
+                  o.elevation + 0.55,
+                ),
+                ellipsoid: {
+                  radii: new C.Cartesian3(0.8, 0.8, 0.75),
+                  material: C.Color.fromCssColorString(
+                    side > 0 ? "#397c3e" : "#5b9347",
+                  ).withAlpha(detailAlpha),
+                  shadows: C.ShadowMode.DISABLED,
+                },
+              }),
             );
           } else {
             e.polygon = polygon(
@@ -641,39 +749,42 @@ export function Viewport(props: Props) {
                 },
               });
               const angle = (o.rotation * Math.PI) / 180;
-              const minaretPoint: Point = [
-                o.points[0][0] +
-                  Math.cos(angle) * o.width * 0.42 -
-                  Math.sin(angle) * o.depth * 0.38,
-                o.points[0][1] +
-                  Math.sin(angle) * o.width * 0.42 +
-                  Math.cos(angle) * o.depth * 0.38,
-              ];
-              v.entities.add({
-                id: `${o.id}:minaret`,
-                position: position(
-                  minaretPoint,
-                  o.elevation + o.floors * o.floorHeight * 0.9,
-                ),
-                cylinder: {
-                  length: o.floors * o.floorHeight * 1.8,
-                  topRadius: 0.65 * o.scale,
-                  bottomRadius: 1.15 * o.scale,
-                  material:
-                    C.Color.fromCssColorString("#f4f0df").withAlpha(opacity),
-                },
-              });
-              v.entities.add({
-                id: `${o.id}:minaret-cap`,
-                position: position(
-                  minaretPoint,
-                  o.elevation + o.floors * o.floorHeight * 1.82,
-                ),
-                ellipsoid: {
-                  radii: new C.Cartesian3(1.2, 1.2, 1.5),
-                  material:
-                    C.Color.fromCssColorString("#2d9b68").withAlpha(opacity),
-                },
+              [-1, 1].forEach((side) => {
+                const minaretPoint: Point = [
+                  o.points[0][0] +
+                    Math.cos(angle) * o.width * 0.42 * side -
+                    Math.sin(angle) * o.depth * 0.38,
+                  o.points[0][1] +
+                    Math.sin(angle) * o.width * 0.42 * side +
+                    Math.cos(angle) * o.depth * 0.38,
+                ];
+                v.entities.add({
+                  id: `${o.id}:minaret-${side}`,
+                  position: position(
+                    minaretPoint,
+                    o.elevation + o.floors * o.floorHeight * 1.05,
+                  ),
+                  cylinder: {
+                    length: o.floors * o.floorHeight * 2.1,
+                    topRadius: 0.65 * o.scale,
+                    bottomRadius: 1.15 * o.scale,
+                    material:
+                      C.Color.fromCssColorString("#f4f0df").withAlpha(opacity),
+                    shadows: C.ShadowMode.DISABLED,
+                  },
+                });
+                v.entities.add({
+                  id: `${o.id}:minaret-cap-${side}`,
+                  position: position(
+                    minaretPoint,
+                    o.elevation + o.floors * o.floorHeight * 2.12,
+                  ),
+                  ellipsoid: {
+                    radii: new C.Cartesian3(1.15, 1.15, 1.7),
+                    material:
+                      C.Color.fromCssColorString("#c9a348").withAlpha(opacity),
+                  },
+                });
               });
             }
             if (o.assetRef.startsWith("builtin:society:")) {
@@ -818,13 +929,19 @@ export function Viewport(props: Props) {
             new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
           );
           if (o.kind === "tree") {
+            const treeHash = [...o.id].reduce(
+                (sum, character) => sum + character.charCodeAt(0),
+                0,
+              ),
+              foliagePalette = ["#3f8f46", "#4f9d49", "#5b9347", "#397c3e"],
+              foliage = foliagePalette[treeHash % foliagePalette.length];
             if (is2D) {
               e.position = position(o.points[0], z + 0.28);
               e.ellipse = {
                 semiMajorAxis: 3.2 * scale,
                 semiMinorAxis: 3.2 * scale,
                 material: C.Color.fromCssColorString(
-                  variant === "columnar" ? "#568a4c" : "#72a963",
+                  variant === "columnar" ? "#4f7f45" : foliage,
                 ).withAlpha(0.82 * objectOpacity(o)),
                 outline: true,
                 outlineColor: C.Color.fromCssColorString("#4f7b47").withAlpha(
@@ -846,9 +963,11 @@ export function Viewport(props: Props) {
                   selected,
                   20,
                   C.Color.fromCssColorString(
-                    variant === "small" ? "#75dc22" : "#4fcb21",
+                    variant === "small"
+                      ? foliagePalette[(treeHash + 1) % foliagePalette.length]
+                      : foliage,
                   ),
-                  0.1,
+                  0.22,
                 );
               } else {
                 e.ellipsoid = {
@@ -857,7 +976,7 @@ export function Viewport(props: Props) {
                     (palm ? 2.8 : 1.8) * scale,
                     (palm ? 1.5 : 5.2) * scale,
                   ),
-                  material: C.Color.fromCssColorString("#2f7d4f").withAlpha(
+                  material: C.Color.fromCssColorString(foliage).withAlpha(
                     objectOpacity(o),
                   ),
                 };
@@ -1376,7 +1495,11 @@ export function Viewport(props: Props) {
         return;
       }
       for (const e of [...v.entities.values])
-        if (e.id.startsWith("_surface") || e.id.startsWith("_sidewalk"))
+        if (
+          e.id.startsWith("_surface") ||
+          e.id.startsWith("_sidewalk") ||
+          e.id.startsWith("_curb")
+        )
           v.entities.remove(e);
       let i = 0;
       for (const s of data.surfaces) {
@@ -1424,6 +1547,28 @@ export function Viewport(props: Props) {
             },
           });
         }
+        for (const poly of s.curbs) {
+          const ring = (r: Point[]) =>
+            r.map((q) =>
+              C.Cartesian3.fromDegrees(...toGeo(q, props.project.origin)),
+            );
+          v.entities.add({
+            id: `_curb${i++}`,
+            show: props.visible.road && props.opacity.road > 0,
+            polygon: {
+              hierarchy: new C.PolygonHierarchy(
+                ring(poly[0]),
+                poly
+                  .slice(1)
+                  .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
+              ),
+              height: s.elevation + 0.12,
+              material: C.Color.fromCssColorString(
+                props.viewMode === "2d" ? "#ddd9d1" : "#b9bab7",
+              ).withAlpha(props.opacity.road),
+            },
+          });
+        }
       }
       v.scene.requestRender();
     };
@@ -1448,8 +1593,15 @@ export function Viewport(props: Props) {
       v.scene.requestRender();
       return;
     }
-    const cameraStep = 5;
-    const turnStep = C.Math.toRadians(12);
+    const cameraStep =
+      props.navigationProfile === "drone"
+        ? 25
+        : props.navigationProfile === "walk"
+          ? 2
+          : 5;
+    const turnStep = C.Math.toRadians(
+      props.navigationProfile === "walk" ? 8 : 12,
+    );
     if (props.action.type === "rotate-left") v.camera.lookLeft(turnStep);
     else if (props.action.type === "rotate-right") v.camera.lookRight(turnStep);
     else if (props.action.type === "tilt-up") v.camera.lookUp(turnStep / 2);
@@ -1458,6 +1610,11 @@ export function Viewport(props: Props) {
       v.camera.moveForward(cameraStep);
     else if (props.action.type === "move-backward")
       v.camera.moveBackward(cameraStep);
+    else if (props.action.type === "strafe-left") v.camera.moveLeft(cameraStep);
+    else if (props.action.type === "strafe-right")
+      v.camera.moveRight(cameraStep);
+    else if (props.action.type === "move-up") v.camera.moveUp(cameraStep);
+    else if (props.action.type === "move-down") v.camera.moveDown(cameraStep);
     if (
       [
         "rotate-left",
@@ -1466,6 +1623,10 @@ export function Viewport(props: Props) {
         "tilt-down",
         "move-forward",
         "move-backward",
+        "strafe-left",
+        "strafe-right",
+        "move-up",
+        "move-down",
       ].includes(props.action.type)
     ) {
       v.scene.requestRender();
@@ -1488,22 +1649,28 @@ export function Viewport(props: Props) {
       const roads = props.project.objects.filter(
           (object) => object.kind === "road" && object.points.length > 1,
         ),
+        boundaries = props.project.objects.filter(
+          (object) => object.kind === "boundary" && object.points.length > 2,
+        ),
         obstacles = props.project.objects.filter((object) =>
           ["building", "bridge"].includes(object.kind),
+        ),
+        visualObjects = props.project.objects.filter((object) =>
+          ["building", "tree", "plot", "car"].includes(object.kind),
         ),
         candidates = roads.flatMap((road) =>
           road.points.slice(0, -1).flatMap((start, index) => {
             const end = road.points[index + 1],
-              segmentLength = Math.hypot(
-                end[0] - start[0],
-                end[1] - start[1],
-              );
+              segmentLength = Math.hypot(end[0] - start[0], end[1] - start[1]);
             if (segmentLength < 18) return [];
             return [0.35, 0.5, 0.65].map((fraction) => {
               const eye: Point = [
                   start[0] + (end[0] - start[0]) * fraction,
                   start[1] + (end[1] - start[1]) * fraction,
                 ],
+                withinSite =
+                  !boundaries.length ||
+                  boundaries.some((boundary) => inside(eye, boundary.points)),
                 clearance = obstacles.length
                   ? Math.min(
                       ...obstacles.map((object) => {
@@ -1516,10 +1683,17 @@ export function Viewport(props: Props) {
                       }),
                     )
                   : 100,
+                nearbyFeatures = visualObjects.filter(
+                  (object) =>
+                    Math.hypot(
+                      eye[0] - object.points[0][0],
+                      eye[1] - object.points[0][1],
+                    ) < 115,
+                ).length,
                 preferredRoad = /main|boulevard|avenue|collector/i.test(
                   road.name,
                 )
-                  ? 35
+                  ? 55
                   : 0;
               return {
                 road,
@@ -1527,10 +1701,12 @@ export function Viewport(props: Props) {
                 end,
                 eye,
                 score:
-                  Math.min(clearance, 80) +
+                  nearbyFeatures * 7 +
+                  Math.min(clearance, 35) +
                   Math.min(segmentLength, 120) * 0.2 +
                   preferredRoad +
-                  road.width,
+                  road.width +
+                  (withinSite ? 0 : -100000),
               };
             });
           }),
@@ -1549,10 +1725,13 @@ export function Viewport(props: Props) {
           ] as Point),
         ll = toGeo(eye, props.project.origin);
       v.camera.flyTo({
-        destination: C.Cartesian3.fromDegrees(...ll, (road?.elevation ?? 0) + 2.2),
+        destination: C.Cartesian3.fromDegrees(
+          ...ll,
+          (road?.elevation ?? 0) + 5.5,
+        ),
         orientation: {
           heading: Math.atan2(direction[0], direction[1]),
-          pitch: -0.04,
+          pitch: -0.2,
           roll: 0,
         },
         duration: 0.8,
@@ -1578,13 +1757,26 @@ export function Viewport(props: Props) {
       {
         duration: 0.6,
         offset: new C.HeadingPitchRange(
-          0,
-          props.action.type === "perspective" ? -0.65 : -Math.PI / 2,
-          radius * 3,
+          props.action.type === "drone"
+            ? -0.78
+            : props.action.type === "perspective"
+              ? -0.58
+              : 0,
+          props.action.type === "drone"
+            ? -0.68
+            : props.action.type === "perspective"
+              ? -0.52
+              : -Math.PI / 2,
+          radius *
+            (props.action.type === "drone"
+              ? 1.35
+              : props.action.type === "perspective"
+                ? 1.85
+                : 3),
         ),
       },
     );
-  }, [props.action]);
+  }, [props.action, props.navigationProfile]);
   return (
     <div
       className={`viewport${props.navigationMode ? " navigate" : ""}`}
