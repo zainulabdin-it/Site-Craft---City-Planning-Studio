@@ -10,6 +10,13 @@ export function saveLocal(p: Project) {
   localStorage.setItem(key, JSON.stringify([...all, p]));
   localStorage.setItem("sitecraft.active", p.id);
 }
+export function deleteLocal(id: string): Project[] {
+  const remaining = listLocal().filter((project) => project.id !== id);
+  localStorage.setItem(key, JSON.stringify(remaining));
+  if (localStorage.getItem("sitecraft.active") === id)
+    localStorage.removeItem("sitecraft.active");
+  return remaining;
+}
 export async function saveServer(p: Project): Promise<Project> {
   const r = await fetch(`/api/projects/${p.id}`, {
     method: "PUT",

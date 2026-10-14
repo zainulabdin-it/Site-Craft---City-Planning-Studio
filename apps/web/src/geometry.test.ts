@@ -256,6 +256,31 @@ describe("metric geometry and project commands", () => {
       [100, 220],
     ]);
   });
+  it("supports multiple sites and accepts objects inside either boundary", () => {
+    const p = newProject("Multi-site plan"),
+      first = newObject(p, "boundary", [
+        [-200, -100],
+        [-20, -100],
+        [-20, 100],
+        [-200, 100],
+      ]),
+      second = newObject(p, "boundary", [
+        [20, -100],
+        [200, -100],
+        [200, 100],
+        [20, 100],
+      ]),
+      firstHouse = newObject(p, "building", [[-100, 0]]),
+      secondHouse = newObject(p, "building", [[100, 0]]);
+    first.name = "Site 1 boundary";
+    second.name = "Site 2 boundary";
+    p.objects = [first, second, firstHouse, secondHouse];
+    expect(validateProject(p).objects).toHaveLength(4);
+    const outside = newObject(p, "building", [[0, 0]]);
+    expect(() =>
+      validateProject({ ...p, objects: [...p.objects, outside] }),
+    ).toThrow("must remain inside one site boundary");
+  });
   it("validates dimensions, scene persistence, and parametric footprint changes", () => {
     const p = demoProject();
     expect(validateProject(JSON.parse(JSON.stringify(p)))).toEqual(p);

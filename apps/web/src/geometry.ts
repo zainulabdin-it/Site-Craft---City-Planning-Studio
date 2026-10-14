@@ -182,7 +182,6 @@ export function validateProject(input: unknown): Project {
   const ids = new Set<string>(),
     nodes = new Map<string, string>();
   const bounds = p.objects.filter((o) => o.kind === "boundary");
-  if (bounds.length > 1) throw Error("Only one project boundary is supported.");
   for (const o of p.objects) {
     if (ids.has(o.id)) throw Error("Duplicate object ID.");
     ids.add(o.id);
@@ -213,10 +212,11 @@ export function validateProject(input: unknown): Project {
         o.kind === "road" && o.assetRef === "builtin:road:external-access";
       if (externalAccess) {
         const hasInsidePoint = o.points.some((point) =>
-            inside(point, bounds[0].points),
+            bounds.some((boundary) => inside(point, boundary.points)),
           ),
           hasOutsidePoint = o.points.some(
-            (point) => !inside(point, bounds[0].points),
+            (point) =>
+              !bounds.some((boundary) => inside(point, boundary.points)),
           );
         if (!hasInsidePoint || !hasOutsidePoint)
           throw Error(
@@ -227,8 +227,11 @@ export function validateProject(input: unknown): Project {
       const shape = ["building", "bridge"].includes(o.kind)
         ? footprint(o)
         : o.points;
-      if (shape.some((v) => !inside(v, bounds[0].points)))
-        throw Error(`${o.name} must remain inside the design boundary.`);
+      const containingBoundary = bounds.find((boundary) =>
+        shape.every((vertex) => inside(vertex, boundary.points)),
+      );
+      if (!containingBoundary)
+        throw Error(`${o.name} must remain inside one site boundary.`);
       const polygons: MultiPolygon =
         o.kind === "road"
           ? roadSurface([o])
@@ -237,11 +240,11 @@ export function validateProject(input: unknown): Project {
             : [];
       if (polygons.length) {
         const outside = polygonClipping.difference(polygons, [
-          bounds[0].points,
+          containingBoundary.points,
         ]);
         if (outside.some((polygon) => area(polygon[0]) > 0.0001))
           throw Error(
-            `${o.name}'s full surface must remain inside the design boundary.`,
+            `${o.name}'s full surface must remain inside one site boundary.`,
           );
       }
     }

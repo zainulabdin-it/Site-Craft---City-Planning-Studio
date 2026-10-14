@@ -61,6 +61,7 @@ import { command, applyCommand, type Command } from "./history";
 import {
   listLocal,
   saveLocal,
+  deleteLocal,
   saveServer,
   loadServer,
   download,
@@ -81,6 +82,7 @@ import {
   societyAssetCategories,
   type SocietyAssetCategory,
 } from "./societyAssets";
+import { analyzeSite, type SiteAnalysis } from "./siteAnalysis";
 function initial() {
   try {
     const all = listLocal();
@@ -154,9 +156,15 @@ export default function App() {
     [undo, setUndo] = useState<Command[]>([]),
     [redo, setRedo] = useState<Command[]>([]),
     [action, setAction] = useState<ViewAction>({ type: "frame", seq: 0 }),
+    [siteAnalysis, setSiteAnalysis] = useState<{
+      status: "loading" | "ready";
+      boundary: Point[];
+      result?: SiteAnalysis;
+    } | null>(null),
     [dialog, setDialog] = useState<"new" | "open" | "confirm-switch" | null>(
       null,
     ),
+    [pendingDeleteProject, setPendingDeleteProject] = useState(""),
     [projects, setProjects] = useState<Project[]>([]),
     [pendingProject, setPendingProject] = useState<Project | null>(null),
     [pendingProjectStorage, setPendingProjectStorage] = useState<
@@ -291,16 +299,26 @@ export default function App() {
   const finish = () => {
     if (!["boundary", "road", "plot", "freehand"].includes(tool)) return;
     const objectKind = tool === "freehand" ? "plot" : tool;
-    let o = newObject(project, objectKind as Kind, draft);
+    const o = newObject(project, objectKind as Kind, draft);
     if (tool === "freehand") o.name = "Free style shape";
-    const existing = project.objects.find((x) => x.kind === "boundary");
-    if (tool === "boundary" && existing)
-      o = { ...o, id: existing.id, name: existing.name };
+    if (tool === "boundary") {
+      const siteNumber =
+        project.objects.filter((object) => object.kind === "boundary").length +
+        1;
+      o.name = `Site ${siteNumber} boundary`;
+    }
     const updates = tool === "road" ? connectRoad(o, project.objects) : [o];
     if (edit(updates, [], `Draw ${tool}`)) {
       setSelected(o.id);
       cancel();
-      if (tool === "boundary") frame(o.id, "top");
+      if (tool === "boundary") {
+        frame(o.id, "top");
+        const boundary = o.points.map((point) => [...point] as Point);
+        setSiteAnalysis({ status: "loading", boundary });
+        void analyzeSite(boundary, project.origin).then((result) =>
+          setSiteAnalysis({ status: "ready", boundary, result }),
+        );
+      }
     }
   };
   const click = (p: Point, id?: string) => {
@@ -1781,10 +1799,6 @@ export default function App() {
                   if (edit([], [current.id], "Delete object")) setSelected("");
                 }}
                 onDuplicate={() => {
-                  if (current.kind === "boundary") {
-                    setError("A project can have only one boundary.");
-                    return;
-                  }
                   const o = {
                     ...current,
                     id: crypto.randomUUID(),
@@ -2003,113 +2017,304 @@ export default function App() {
       {dialog && (
         <div className="modal-backdrop">
           <section role="dialog" className="modal">
-            <h2>
-              {dialog === "new"
-                ? "Create a project"
-                : dialog === "confirm-switch"
-                  ? "Save current project?"
-                  : "Open a saved project"}
-            </h2>
-            <p className="muted">
-              {dialog === "confirm-switch"
-                ? pendingProject &&
-                  Math.abs(pendingProject.origin[0] - project.origin[0]) <
-                    0.0001 &&
-                  Math.abs(pendingProject.origin[1] - project.origin[1]) <
-                    0.0001
-                  ? "This project uses the same site. Open it separately or add all of its objects as a new project layer."
-                  : status === "Unsaved"
-                    ? "You have unsaved work. Save it before opening another project."
-                    : "The selected project uses another map location. It can be opened separately, but cannot be added as a project layer."
-                : "Projects retain their exact map origin, boundary and object positions."}
-            </p>
+            <div className="modal-header">
+              <div>
+                <h2>
+                  {dialog === "new"
+                    ? "Create a project"
+                    : dialog === "confirm-switch"
+                      ? "Save current project?"
+                      : "Open a saved project"}
+                </h2>
+                <p className="muted">
+                  {dialog === "confirm-switch"
+                    ? pendingProject &&
+                      Math.abs(pendingProject.origin[0] - project.origin[0]) <
+                        0.0001 &&
+                      Math.abs(pendingProject.origin[1] - project.origin[1]) <
+                        0.0001
+                      ? "This project uses the same site. Open it separately or add all of its objects as a new project layer."
+                      : status === "Unsaved"
+                        ? "You have unsaved work. Save it before opening another project."
+                        : "The selected project uses another map location. It can be opened separately, but cannot be added as a project layer."
+                    : dialog === "open"
+                      ? "The last active browser project opens by default. With no active save, the Christchurch demo opens."
+                      : "Projects retain their exact map origin, boundary and object positions."}
+                </p>
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Close dialog"
+                onClick={() => {
+                  setPendingProject(null);
+                  setPendingProjectStorage(null);
+                  setPendingDeleteProject("");
+                  setDialog(null);
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
             {dialog === "confirm-switch" ? (
               <>
-                <button
-                  className="primary"
-                  onClick={async () => {
-                    if (!pendingProject) return;
-                    const next = pendingProject;
-                    if (await save())
-                      switchProject(
-                        next,
-                        true,
-                        pendingProjectStorage ?? storage,
-                      );
-                  }}
-                >
-                  Save current &amp; open
-                </button>
-                <button
-                  onClick={() => {
-                    if (pendingProject)
-                      switchProject(
-                        pendingProject,
-                        true,
-                        pendingProjectStorage ?? storage,
-                      );
-                  }}
-                >
-                  Open as separate project
-                </button>
-                {pendingProject &&
-                  Math.abs(pendingProject.origin[0] - project.origin[0]) <
-                    0.0001 &&
-                  Math.abs(pendingProject.origin[1] - project.origin[1]) <
-                    0.0001 && (
-                    <button onClick={() => addProjectLayer(pendingProject)}>
-                      Add as separate project
-                    </button>
-                  )}
+                <div className="modal-actions">
+                  <button
+                    className="primary"
+                    onClick={async () => {
+                      if (!pendingProject) return;
+                      const next = pendingProject;
+                      if (await save())
+                        switchProject(
+                          next,
+                          true,
+                          pendingProjectStorage ?? storage,
+                        );
+                    }}
+                  >
+                    Save current &amp; open
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (pendingProject)
+                        switchProject(
+                          pendingProject,
+                          true,
+                          pendingProjectStorage ?? storage,
+                        );
+                    }}
+                  >
+                    Open separately
+                  </button>
+                  {pendingProject &&
+                    Math.abs(pendingProject.origin[0] - project.origin[0]) <
+                      0.0001 &&
+                    Math.abs(pendingProject.origin[1] - project.origin[1]) <
+                      0.0001 && (
+                      <button onClick={() => addProjectLayer(pendingProject)}>
+                        Add as project layer
+                      </button>
+                    )}
+                  <button onClick={() => setDialog(null)}>Cancel</button>
+                </div>
               </>
             ) : dialog === "new" ? (
               <>
-                <label className="field">
-                  Project name
-                  <input
-                    autoFocus
-                    value={name}
-                    maxLength={100}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </label>
-                <button
-                  className="primary"
-                  disabled={!name.trim()}
-                  onClick={() =>
-                    requestProjectSwitch(newProject(name.trim()), false)
-                  }
-                >
-                  Create project
-                </button>
+                <div className="modal-body">
+                  <label className="field">
+                    Project name
+                    <input
+                      autoFocus
+                      value={name}
+                      maxLength={100}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="modal-actions">
+                  <button onClick={() => setDialog(null)}>Cancel</button>
+                  <button
+                    className="primary"
+                    disabled={!name.trim()}
+                    onClick={() =>
+                      requestProjectSwitch(newProject(name.trim()), false)
+                    }
+                  >
+                    Create project
+                  </button>
+                </div>
               </>
             ) : (
               <>
                 <div className="saved-projects">
-                  {projects.map((p) => (
-                    <button key={p.id} onClick={() => requestProjectSwitch(p)}>
-                      {p.name}
-                      <small>{p.objects.length} objects</small>
-                    </button>
+                  {projects.map((savedProject) => (
+                    <div className="saved-project-row" key={savedProject.id}>
+                      <button
+                        className="saved-project-open"
+                        onClick={() => requestProjectSwitch(savedProject)}
+                      >
+                        <span>{savedProject.name}</span>
+                        <small>{savedProject.objects.length} objects</small>
+                      </button>
+                      <button
+                        className={
+                          pendingDeleteProject === savedProject.id
+                            ? "saved-project-delete confirming"
+                            : "saved-project-delete"
+                        }
+                        aria-label={`Delete ${savedProject.name}`}
+                        title={
+                          pendingDeleteProject === savedProject.id
+                            ? "Click again to confirm"
+                            : "Delete saved project"
+                        }
+                        onClick={() => {
+                          if (pendingDeleteProject !== savedProject.id) {
+                            setPendingDeleteProject(savedProject.id);
+                            return;
+                          }
+                          setProjects(deleteLocal(savedProject.id));
+                          setPendingDeleteProject("");
+                          if (savedProject.id === project.id)
+                            setStatus("Unsaved");
+                        }}
+                      >
+                        {pendingDeleteProject === savedProject.id ? (
+                          <span>Confirm</span>
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                      </button>
+                    </div>
                   ))}
                 </div>
-                {!projects.length && <p>No saved projects here yet.</p>}
-                <button
-                  onClick={() => requestProjectSwitch(zarajNzProject(), false)}
-                >
-                  Load Zaraj-inspired New Zealand society
-                </button>
+                {!projects.length && (
+                  <p className="empty-saved-projects">
+                    No browser projects saved yet.
+                  </p>
+                )}
+                <div className="modal-actions">
+                  <button onClick={() => setDialog(null)}>Cancel</button>
+                  <button
+                    onClick={() =>
+                      requestProjectSwitch(zarajNzProject(), false)
+                    }
+                  >
+                    Load Zaraj demo
+                  </button>
+                </div>
               </>
             )}
-            <button
-              onClick={() => {
-                setPendingProject(null);
-                setPendingProjectStorage(null);
-                setDialog(null);
-              }}
-            >
-              Cancel
-            </button>
+          </section>
+        </div>
+      )}
+      {siteAnalysis && (
+        <div className="modal-backdrop site-analysis-backdrop">
+          <section
+            role="dialog"
+            aria-label="Site analysis"
+            className="modal site-analysis-modal"
+          >
+            <div className="site-analysis-heading">
+              <div>
+                <small>BOUNDARY CHECK</small>
+                <h2>Site analysis</h2>
+                <p className="muted">
+                  Existing map context around the boundary.
+                </p>
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Close site analysis"
+                onClick={() => setSiteAnalysis(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {siteAnalysis.status === "loading" || !siteAnalysis.result ? (
+              <div className="site-analysis-loading">
+                <span className="analysis-spinner" />
+                <b>Checking roads and nearby map features…</b>
+                <small>
+                  OpenStreetMap analysis usually takes a few seconds.
+                </small>
+              </div>
+            ) : (
+              <>
+                <div className="analysis-metrics">
+                  <article>
+                    <small>AREA</small>
+                    <b>{siteAnalysis.result.areaHa.toFixed(2)} ha</b>
+                  </article>
+                  <article>
+                    <small>SIZE</small>
+                    <b>
+                      {siteAnalysis.result.widthM.toFixed(0)} ×{" "}
+                      {siteAnalysis.result.depthM.toFixed(0)} m
+                    </b>
+                  </article>
+                  <article>
+                    <small>PERIMETER</small>
+                    <b>{siteAnalysis.result.perimeterM.toFixed(0)} m</b>
+                  </article>
+                  <article>
+                    <small>ROADS WITHIN 150 M</small>
+                    <b>{siteAnalysis.result.nearbyRoads}</b>
+                  </article>
+                </div>
+                <div className="analysis-sections">
+                  <article>
+                    <h3>Road access</h3>
+                    {siteAnalysis.result.nearestRoad ? (
+                      <p>
+                        Nearest mapped road:{" "}
+                        <b>{siteAnalysis.result.nearestRoad.name}</b> ·{" "}
+                        {siteAnalysis.result.nearestRoad.distanceM.toFixed(0)} m
+                      </p>
+                    ) : (
+                      <p>No mapped road was found nearby.</p>
+                    )}
+                    <div className="analysis-tags">
+                      {siteAnalysis.result.accessRoads.map((road) => (
+                        <span key={road}>{road}</span>
+                      ))}
+                      {!siteAnalysis.result.accessRoads.length && (
+                        <span className="warning-tag">Access required</span>
+                      )}
+                    </div>
+                  </article>
+                  <article>
+                    <h3>Existing context</h3>
+                    <p>
+                      {siteAnalysis.result.existingBuildings} mapped buildings ·{" "}
+                      {siteAnalysis.result.waterFeatures} water features
+                    </p>
+                    <div className="analysis-tags">
+                      {siteAnalysis.result.landUse.map((item) => (
+                        <span key={item}>{item.replaceAll("_", " ")}</span>
+                      ))}
+                      {!siteAnalysis.result.landUse.length && (
+                        <span>No mapped land use</span>
+                      )}
+                    </div>
+                  </article>
+                  <article className="analysis-notes">
+                    <h3>Before designing</h3>
+                    <ul>
+                      {siteAnalysis.result.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
+                <small className="analysis-source">
+                  {siteAnalysis.result.sourceAvailable
+                    ? "Map context: © OpenStreetMap contributors. Concept check only."
+                    : "Local boundary measurements only."}
+                </small>
+              </>
+            )}
+            <div className="modal-actions">
+              {siteAnalysis.status === "ready" && (
+                <button
+                  onClick={() => {
+                    const boundary = siteAnalysis.boundary;
+                    setSiteAnalysis({ status: "loading", boundary });
+                    void analyzeSite(boundary, project.origin).then((result) =>
+                      setSiteAnalysis({ status: "ready", boundary, result }),
+                    );
+                  }}
+                >
+                  Run again
+                </button>
+              )}
+              <button
+                className="primary"
+                disabled={siteAnalysis.status === "loading"}
+                onClick={() => setSiteAnalysis(null)}
+              >
+                Start designing
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -2120,11 +2325,25 @@ export default function App() {
             aria-label="Import 3D asset"
             className="modal asset-modal"
           >
-            <h2>Import a 3D asset</h2>
-            <p className="muted">
-              Add one binary GLB model to My Assets. The file stays in this
-              browser.
-            </p>
+            <div className="modal-header">
+              <div>
+                <h2>Import a 3D asset</h2>
+                <p className="muted">
+                  Add one binary GLB model to My Assets. The file stays in this
+                  browser.
+                </p>
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Close asset import"
+                onClick={() => {
+                  setAssetDialog(false);
+                  setAssetFile(null);
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
             <label className="asset-drop">
               <Upload size={24} />
               <b>{assetFile?.name || "Choose a .glb file"}</b>
@@ -2197,6 +2416,14 @@ export default function App() {
             </div>
             <div className="modal-actions">
               <button
+                onClick={() => {
+                  setAssetDialog(false);
+                  setAssetFile(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
                 className="primary"
                 disabled={
                   importingAsset ||
@@ -2248,14 +2475,6 @@ export default function App() {
                 }}
               >
                 {importingAsset ? "Importing…" : "Add to library"}
-              </button>
-              <button
-                onClick={() => {
-                  setAssetDialog(false);
-                  setAssetFile(null);
-                }}
-              >
-                Cancel
               </button>
             </div>
           </section>
