@@ -246,6 +246,17 @@ export const societyAssets: SocietyAssetDefinition[] = [
     color: "#5fa76d",
   },
   {
+    assetRef: "builtin:society:theme-park",
+    name: "Family theme park",
+    category: "Recreation",
+    kind: "plot",
+    buildingType: "Community",
+    width: 70,
+    depth: 50,
+    height: 1,
+    color: "#d7b9e8",
+  },
+  {
     assetRef: "builtin:society:public-toilet",
     name: "Public toilet",
     category: "Community",

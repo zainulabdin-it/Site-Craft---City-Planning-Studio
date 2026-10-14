@@ -315,6 +315,13 @@ export default function App() {
       window.removeEventListener("sitecraft-assets-changed", refreshAssets);
   }, []);
   useEffect(() => {
+    const initialFrame = window.setTimeout(
+      () => setAction({ type: "frame", seq: Date.now() }),
+      250,
+    );
+    return () => window.clearTimeout(initialFrame);
+  }, []);
+  useEffect(() => {
     if (!error) return;
     const timeout = window.setTimeout(() => setError(""), 2000);
     return () => window.clearTimeout(timeout);

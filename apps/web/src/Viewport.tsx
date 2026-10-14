@@ -55,12 +55,15 @@ interface Props {
 }
 export function Viewport(props: Props) {
   const [assetVersion, setAssetVersion] = useState(0);
+  const [terrainVersion, setTerrainVersion] = useState(0);
   const container = useRef<HTMLDivElement>(null),
     viewer = useRef<C.Viewer | null>(null),
     latest = useRef(props),
     cache = useRef(new Map<string, DesignObject>()),
     opacityCache = useRef(new Map<string, number>()),
-    modeCache = useRef("");
+    modeCache = useRef(""),
+    terrainActive = useRef(false),
+    hasInitialFrame = useRef(false);
   latest.current = props;
   useEffect(() => {
     let active = true;
@@ -81,7 +84,7 @@ export function Viewport(props: Props) {
   }, []);
   useEffect(() => {
     cache.current.clear();
-  }, [assetVersion]);
+  }, [assetVersion, terrainVersion]);
   const roadKey = JSON.stringify([
     props.project.origin,
     props.project.objects.filter((o) => o.kind === "road"),
@@ -128,6 +131,8 @@ export function Viewport(props: Props) {
     v.scene.fog.enabled = true;
     v.scene.fog.density = 0.00012;
     v.scene.globe.baseColor = C.Color.fromCssColorString("#dce7d2");
+    v.scene.globe.maximumScreenSpaceError = 3;
+    v.scene.globe.tileCacheSize = 250;
     v.scene.globe.depthTestAgainstTerrain = false;
     const provider = new C.OpenStreetMapImageryProvider({
       url: "https://tile.openstreetmap.org/",
@@ -155,6 +160,8 @@ export function Viewport(props: Props) {
         .then((terrain) => {
           if (!v.isDestroyed()) {
             v.terrainProvider = terrain;
+            terrainActive.current = true;
+            setTerrainVersion((version) => version + 1);
             v.scene.globe.depthTestAgainstTerrain = true;
             latest.current.onContext(
               "Location terrain · real elevation and terrain-aware camera",
@@ -173,6 +180,8 @@ export function Viewport(props: Props) {
         .then((t) => {
           if (!v.isDestroyed()) {
             v.terrainProvider = t;
+            terrainActive.current = true;
+            setTerrainVersion((version) => version + 1);
             v.scene.globe.depthTestAgainstTerrain = true;
             latest.current.onContext(
               "Cesium World Terrain · conceptual designs use ellipsoid offsets",
@@ -198,10 +207,74 @@ export function Viewport(props: Props) {
     v.scene.renderError.addEventListener((_s, e) =>
       latest.current.onError(`Rendering error: ${String(e)}`),
     );
-    v.camera.setView({
-      destination: C.Cartesian3.fromDegrees(...props.project.origin, 850),
-      orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
-    });
+    const initialPoints =
+        props.project.objects.find((object) => object.kind === "boundary")
+          ?.points || ([[0, 0]] as Point[]),
+      initialCenter: Point = [
+        initialPoints.reduce((sum, point) => sum + point[0], 0) /
+          initialPoints.length,
+        initialPoints.reduce((sum, point) => sum + point[1], 0) /
+          initialPoints.length,
+      ],
+      initialRadius = Math.max(
+        120,
+        ...initialPoints.map((point) =>
+          Math.hypot(point[0] - initialCenter[0], point[1] - initialCenter[1]),
+        ),
+      ),
+      initialGeo = toGeo(initialCenter, props.project.origin);
+    v.camera.viewBoundingSphere(
+      new C.BoundingSphere(
+        C.Cartesian3.fromDegrees(...initialGeo),
+        initialRadius,
+      ),
+      new C.HeadingPitchRange(0, -Math.PI / 2, initialRadius * 3),
+    );
+    v.camera.lookAtTransform(C.Matrix4.IDENTITY);
+    if (!hasInitialFrame.current) {
+      const boundary = props.project.objects.find(
+          (object) => object.kind === "boundary",
+        ),
+        framePoints = boundary?.points || ([[0, 0]] as Point[]),
+        frameCenter: Point = [
+          framePoints.reduce((sum, point) => sum + point[0], 0) /
+            framePoints.length,
+          framePoints.reduce((sum, point) => sum + point[1], 0) /
+            framePoints.length,
+        ],
+        frameRadius = Math.max(
+          300,
+          ...framePoints.map((point) =>
+            Math.hypot(point[0] - frameCenter[0], point[1] - frameCenter[1]),
+          ),
+        ),
+        frameGeo = toGeo(frameCenter, props.project.origin);
+      hasInitialFrame.current = true;
+      v.camera.flyToBoundingSphere(
+        new C.BoundingSphere(
+          C.Cartesian3.fromDegrees(...frameGeo),
+          frameRadius,
+        ),
+        {
+          duration: 0.01,
+          offset: new C.HeadingPitchRange(0, -Math.PI / 2, frameRadius * 3),
+        },
+      );
+    }
+    v.scene.requestRender();
+    const initialFrameTimer = window.setTimeout(() => {
+      if (v.isDestroyed()) return;
+      v.camera.flyToBoundingSphere(
+        new C.BoundingSphere(
+          C.Cartesian3.fromDegrees(...initialGeo),
+          initialRadius,
+        ),
+        {
+          duration: 0.01,
+          offset: new C.HeadingPitchRange(0, -Math.PI / 2, initialRadius * 3),
+        },
+      );
+    }, 120);
     const h = new C.ScreenSpaceEventHandler(v.canvas);
     const pickedIds = (position: C.Cartesian2) =>
       v.scene
@@ -346,6 +419,7 @@ export function Viewport(props: Props) {
       C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK,
     );
     return () => {
+      window.clearTimeout(initialFrameTimer);
       v.scene.screenSpaceCameraController.enableInputs = true;
       h.destroy();
       v.destroy();
@@ -392,6 +466,12 @@ export function Viewport(props: Props) {
       hierarchy: new C.PolygonHierarchy(points.map((q) => position(q))),
       height: z,
       extrudedHeight: z + height,
+      ...(terrainActive.current
+        ? {
+            heightReference: C.HeightReference.RELATIVE_TO_GROUND,
+            extrudedHeightReference: C.HeightReference.RELATIVE_TO_GROUND,
+          }
+        : {}),
       material: color,
       outline: false,
     });
@@ -411,6 +491,9 @@ export function Viewport(props: Props) {
     ) => ({
       uri,
       scale,
+      ...(terrainActive.current
+        ? { heightReference: C.HeightReference.RELATIVE_TO_GROUND }
+        : {}),
       minimumPixelSize,
       maximumScale: scale * 2.4,
       color: tint.withAlpha(alpha),
@@ -1070,6 +1153,10 @@ export function Viewport(props: Props) {
                     material: C.Color.fromCssColorString(glass).withAlpha(
                       objectOpacity(o) * 0.88,
                     ),
+                    distanceDisplayCondition: new C.DistanceDisplayCondition(
+                      0,
+                      1400,
+                    ),
                   },
                 });
               }
@@ -1091,6 +1178,10 @@ export function Viewport(props: Props) {
                 material: C.Color.fromCssColorString("#31566f").withAlpha(
                   objectOpacity(o) * 0.92,
                 ),
+                distanceDisplayCondition: new C.DistanceDisplayCondition(
+                  0,
+                  1400,
+                ),
               },
             });
             v.entities.add({
@@ -1108,6 +1199,10 @@ export function Viewport(props: Props) {
                 ),
                 material: C.Color.fromCssColorString("#e8e2d7").withAlpha(
                   objectOpacity(o),
+                ),
+                distanceDisplayCondition: new C.DistanceDisplayCondition(
+                  0,
+                  1400,
                 ),
               },
             });
@@ -1264,6 +1359,17 @@ export function Viewport(props: Props) {
                 ),
               };
               v.entities.add({
+                id: `${o.id}:arm`,
+                position: position(o.points[0], z + 7.75 * scale),
+                orientation: e.orientation as C.Quaternion,
+                box: {
+                  dimensions: new C.Cartesian3(2.5 * scale, 0.18, 0.18),
+                  material: C.Color.fromCssColorString("#39434d").withAlpha(
+                    objectOpacity(o),
+                  ),
+                },
+              });
+              v.entities.add({
                 id: `${o.id}:lamp`,
                 position: position(o.points[0], z + 8.1 * scale),
                 ellipsoid: {
@@ -1296,6 +1402,40 @@ export function Viewport(props: Props) {
                   },
                 }),
               );
+            } else if (
+              o.kind === "bench" &&
+              ["bin", "bollard", "planter"].includes(variant)
+            ) {
+              const propHeight =
+                variant === "bollard" ? 1.1 : variant === "bin" ? 1.25 : 0.75;
+              e.position = position(o.points[0], z + (propHeight * scale) / 2);
+              e.cylinder = {
+                length: propHeight * scale,
+                topRadius: (variant === "bollard" ? 0.14 : 0.48) * scale,
+                bottomRadius: (variant === "bollard" ? 0.2 : 0.55) * scale,
+                material: C.Color.fromCssColorString(
+                  variant === "planter"
+                    ? "#9b6848"
+                    : variant === "bin"
+                      ? "#3f7654"
+                      : "#4b5563",
+                ).withAlpha(objectOpacity(o)),
+              };
+              if (variant === "planter")
+                v.entities.add({
+                  id: `${o.id}:plant`,
+                  position: position(o.points[0], z + 1.2 * scale),
+                  ellipsoid: {
+                    radii: new C.Cartesian3(
+                      0.75 * scale,
+                      0.75 * scale,
+                      0.65 * scale,
+                    ),
+                    material: C.Color.fromCssColorString("#4b934f").withAlpha(
+                      objectOpacity(o),
+                    ),
+                  },
+                });
             } else if (
               o.kind === "bench" &&
               o.assetRef.startsWith("builtin:society:")
@@ -1623,6 +1763,7 @@ export function Viewport(props: Props) {
     props.draft,
     props.navigationMode,
     assetVersion,
+    terrainVersion,
     props.viewMode,
   ]);
   useEffect(() => {
@@ -1747,6 +1888,9 @@ export function Viewport(props: Props) {
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
               height: s.elevation + 0.08,
+              ...(terrainActive.current
+                ? { heightReference: C.HeightReference.RELATIVE_TO_GROUND }
+                : {}),
               material: C.Color.fromCssColorString(
                 props.viewMode === "2d" ? "#f4f3ef" : "#d9d7cf",
               ).withAlpha(props.opacity.road),
@@ -1769,6 +1913,9 @@ export function Viewport(props: Props) {
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
               height: s.elevation + 0.14,
+              ...(terrainActive.current
+                ? { heightReference: C.HeightReference.RELATIVE_TO_GROUND }
+                : {}),
               material: C.Color.fromCssColorString(
                 props.viewMode === "2d" ? "#d7d9d8" : "#3f474d",
               ).withAlpha(props.opacity.road),
@@ -1791,6 +1938,9 @@ export function Viewport(props: Props) {
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
               height: s.elevation + 0.12,
+              ...(terrainActive.current
+                ? { heightReference: C.HeightReference.RELATIVE_TO_GROUND }
+                : {}),
               material: C.Color.fromCssColorString(
                 props.viewMode === "2d" ? "#ddd9d1" : "#b9bab7",
               ).withAlpha(props.opacity.road),
@@ -1809,7 +1959,13 @@ export function Viewport(props: Props) {
       w.onmessage = null;
       w.terminate();
     };
-  }, [roadKey, props.visible.road, props.opacity.road, props.viewMode]);
+  }, [
+    roadKey,
+    props.visible.road,
+    props.opacity.road,
+    props.viewMode,
+    terrainVersion,
+  ]);
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
@@ -1952,18 +2108,25 @@ export function Viewport(props: Props) {
             start[1] + (direction[1] / distance) * 6,
           ] as Point),
         ll = toGeo(eye, props.project.origin);
-      v.camera.flyTo({
-        destination: C.Cartesian3.fromDegrees(
-          ...ll,
-          (road?.elevation ?? 0) + 5.5,
-        ),
-        orientation: {
-          heading: Math.atan2(direction[0], direction[1]),
-          pitch: -0.2,
-          roll: 0,
-        },
-        duration: 0.8,
-      });
+      const streetCartographic = C.Cartographic.fromDegrees(...ll);
+      C.sampleTerrainMostDetailed(v.terrainProvider, [streetCartographic])
+        .catch(() => [streetCartographic])
+        .then(([sample]) => {
+          if (v.isDestroyed()) return;
+          v.camera.flyTo({
+            destination: C.Cartesian3.fromRadians(
+              sample.longitude,
+              sample.latitude,
+              (sample.height || 0) + (road?.elevation ?? 0) + 5.5,
+            ),
+            orientation: {
+              heading: Math.atan2(direction[0], direction[1]),
+              pitch: -0.2,
+              roll: 0,
+            },
+            duration: 0.8,
+          });
+        });
       return;
     }
     const o = props.project.objects.find((o) => o.id === props.action.id);
