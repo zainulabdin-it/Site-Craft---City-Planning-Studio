@@ -589,6 +589,35 @@ export function Viewport(props: Props) {
                 },
               });
             }
+            if (!is2D && maxX - minX > 24) {
+              const islandY = (minY + maxY) / 2;
+              [minX + 2.2, maxX - 2.2].forEach((x, index) => {
+                v.entities.add({
+                  id: `${o.id}:landscape-island-${index}`,
+                  position: position([x, islandY], o.elevation + 0.42),
+                  box: {
+                    dimensions: new C.Cartesian3(
+                      3.4,
+                      Math.min(7, maxY - minY - 3),
+                      0.32,
+                    ),
+                    material: C.Color.fromCssColorString("#c8c3b7").withAlpha(
+                      objectOpacity(o),
+                    ),
+                  },
+                });
+                v.entities.add({
+                  id: `${o.id}:island-plant-${index}`,
+                  position: position([x, islandY], o.elevation + 0.92),
+                  ellipsoid: {
+                    radii: new C.Cartesian3(1.15, 2.2, 0.75),
+                    material: C.Color.fromCssColorString(
+                      index ? "#437d47" : "#568d4c",
+                    ).withAlpha(objectOpacity(o)),
+                  },
+                });
+              });
+            }
           }
           if (
             !is2D &&
@@ -1275,22 +1304,27 @@ export function Viewport(props: Props) {
               const palm = variant === "palm",
                 columnar = variant === "columnar";
               if (!palm && !columnar) {
-                const treeScale = 6.2 * scale;
+                const proofTree = o.assetRef.startsWith("cc0:proof:tree-");
+                const treeScale = (proofTree ? 1.15 : 6.2) * scale;
                 e.position = position(o.points[0], z + 0.15);
                 e.model = model(
-                  variant === "small"
-                    ? "/assets/kenney/suburban/tree-small.glb"
-                    : "/assets/kenney/suburban/tree-large.glb",
+                  proofTree
+                    ? `/assets/cc0-proof/park-tree-${variant}.glb`
+                    : variant === "small"
+                      ? "/assets/kenney/suburban/tree-small.glb"
+                      : "/assets/kenney/suburban/tree-large.glb",
                   treeScale,
                   objectOpacity(o),
                   selected,
                   20,
-                  C.Color.fromCssColorString(
-                    variant === "small"
-                      ? foliagePalette[(treeHash + 1) % foliagePalette.length]
-                      : foliage,
-                  ),
-                  0.22,
+                  proofTree
+                    ? C.Color.WHITE
+                    : C.Color.fromCssColorString(
+                        variant === "small"
+                          ? foliagePalette[(treeHash + 1) % foliagePalette.length]
+                          : foliage,
+                      ),
+                  proofTree ? 0 : 0.22,
                 );
               } else {
                 e.ellipsoid = {

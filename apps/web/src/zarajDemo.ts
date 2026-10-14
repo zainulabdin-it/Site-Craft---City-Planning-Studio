@@ -314,10 +314,7 @@ export function zarajNzProject() {
   for (let i = 0; i < 46; i++) {
     const x = -255 + (i % 12) * 18,
       y = 195 + Math.floor(i / 12) * 38;
-    const treeRef =
-      i % 7 === 0
-        ? "builtin:tree:columnar"
-        : `kenney:tree:${i % 3 === 0 ? "small" : "large"}`;
+    const treeRef = `cc0:proof:tree-${["a", "b", "c"][i % 3]}`;
     add("tree", [[x, y]], `Main Park tree ${i + 1}`, {
       scale: 0.75 + (i % 4) * 0.12,
       color: i % 3 ? "#45a342" : "#73bd3f",
@@ -615,17 +612,14 @@ export function zarajNzProject() {
     add("tree", [[x, i % 2 ? 360 : -360]], `Boundary green belt ${i + 1}`, {
       scale: 0.72 + (i % 3) * 0.08,
       color: "#4e9f45",
-      assetRef:
-        i % 5 === 0
-          ? "builtin:tree:columnar"
-          : `kenney:tree:${i % 2 ? "small" : "large"}`,
+      assetRef: `cc0:proof:tree-${["a", "b", "c"][i % 3]}`,
     });
   }
   // Continuous green streets, pocket parks and daily-use furniture make each sector feel occupied.
   const treeVariants = [
-    "kenney:tree:large",
-    "kenney:tree:small",
-    "builtin:tree:columnar",
+    "cc0:proof:tree-a",
+    "cc0:proof:tree-b",
+    "cc0:proof:tree-c",
   ];
   [-455, -365, -220, -145, 145, 220, 365, 455].forEach((x, xi) =>
     [-295, -105, 25, 230].forEach((y, yi) =>
