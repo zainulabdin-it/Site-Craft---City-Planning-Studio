@@ -1058,6 +1058,10 @@ main {
   font-size: 11px;
   font-weight: 700;
 }
+.view-switch button.active {
+  color: #1d4ed8;
+  background: #e8f0ff;
+}
 .toolbar {
   position: absolute;
   left: 0;
@@ -1137,6 +1141,48 @@ main {
 .zoom-controls button + button {
   border-top: 1px solid #dce4dd;
 }
+.street-controls {
+  position: absolute;
+  right: 56px;
+  bottom: 48px;
+  z-index: 10;
+  width: 132px;
+  padding: 9px;
+  border: 1px solid #d7e0d9;
+  border-radius: 10px;
+  background: #fffffff2;
+  box-shadow: 0 4px 18px #17342924;
+  text-align: center;
+}
+.street-controls > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #53665d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.street-control-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  justify-content: center;
+  gap: 4px;
+}
+.street-control-grid button {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border-color: #d7e0d9;
+  border-radius: 5px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.street-controls small {
+  display: block;
+  margin-top: 7px;
+  color: #708078;
+  font-size: 8px;
+}
 .drawing-hint {
   position: absolute;
   bottom: 65px;
@@ -1186,25 +1232,40 @@ main {
   bottom: 35px !important;
 }
 .error {
-  position: absolute;
-  top: 160px;
-  left: 20px;
-  right: 20px;
+  position: fixed;
+  top: 84px;
+  right: 22px;
+  width: min(390px, calc(100vw - 44px));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px;
+  gap: 14px;
+  padding: 13px 14px;
   background: #fff0e9;
   color: #95462c;
-  box-shadow: 0 3px 15px #0001;
+  box-shadow: 0 10px 30px #1725542b;
   border: 1px solid #eac3b3;
-  border-radius: 7px;
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  z-index: 1000;
+  animation: toast-in 160ms ease-out;
 }
 .error button {
+  flex: 0 0 auto;
   padding: 4px;
   background: transparent;
   border: 0;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .field {
   display: flex;

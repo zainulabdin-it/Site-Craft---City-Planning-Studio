@@ -133,6 +133,7 @@ export default function App() {
       boot.project.designLayers.map((layer) => layer.kind),
     ),
     [engine, setEngine] = useState("Cesium 3D"),
+    [viewMode, setViewMode] = useState<"2d" | "3d" | "street">("3d"),
     [layersOpen, setLayersOpen] = useState(true),
     [currentProjectExpanded, setCurrentProjectExpanded] = useState(true),
     [expandedProjectLayers, setExpandedProjectLayers] = useState<Set<string>>(
@@ -203,6 +204,11 @@ export default function App() {
     return () =>
       window.removeEventListener("sitecraft-assets-changed", refreshAssets);
   }, []);
+  useEffect(() => {
+    if (!error) return;
+    const timeout = window.setTimeout(() => setError(""), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [error]);
   const edit = (
     updates: DesignObject[],
     remove: string[] = [],
@@ -223,8 +229,12 @@ export default function App() {
       return false;
     }
   };
-  const frame = (id?: string, type: ViewAction["type"] = "frame") =>
+  const frame = (id?: string, type: ViewAction["type"] = "frame") => {
+    if (type === "top") setViewMode("2d");
+    else if (type === "perspective") setViewMode("3d");
+    else if (type === "street") setViewMode("street");
     setAction({ id, type, seq: Date.now() });
+  };
   const persistDesignLayers = (
     order: Kind[],
     nextVisible = visible,
@@ -516,7 +526,9 @@ export default function App() {
       Math.abs(source.origin[0] - project.origin[0]) < 0.0001 &&
       Math.abs(source.origin[1] - project.origin[1]) < 0.0001;
     if (!sameSite) {
-      setError("Only projects at the same map location can be added as a layer.");
+      setError(
+        "Only projects at the same map location can be added as a layer.",
+      );
       return;
     }
     const layer: ProjectLayer = {
@@ -826,7 +838,9 @@ export default function App() {
                 <select
                   value={storage}
                   onChange={(e) =>
-                    setStorage(e.target.value as "local" | "server" | "computer")
+                    setStorage(
+                      e.target.value as "local" | "server" | "computer",
+                    )
                   }
                 >
                   <option value="local">This browser</option>
@@ -835,7 +849,10 @@ export default function App() {
                 </select>
               </label>
               <div className="project-context-row">
-                <button onClick={() => frame()} className="compact-frame-button">
+                <button
+                  onClick={() => frame()}
+                  className="compact-frame-button"
+                >
                   <Focus size={14} /> <span>Frame project</span>
                 </button>
                 <div
@@ -868,7 +885,9 @@ export default function App() {
             >
               <Layers size={15} /> Layers{" "}
               <span>
-                {kinds.length + project.dataLayers.length + project.projectLayers.length}{" "}
+                {kinds.length +
+                  project.dataLayers.length +
+                  project.projectLayers.length}{" "}
                 {layersOpen ? "⌃" : "⌄"}
               </span>
             </button>
@@ -919,7 +938,9 @@ export default function App() {
                         checked={layer.visible}
                         onClick={(event) => event.stopPropagation()}
                         onChange={(event) =>
-                          updateProjectLayer(layer.id, { visible: event.target.checked })
+                          updateProjectLayer(layer.id, {
+                            visible: event.target.checked,
+                          })
                         }
                       />
                       <Layers size={15} />
@@ -930,20 +951,28 @@ export default function App() {
                         maxLength={100}
                         onClick={(event) => event.stopPropagation()}
                         onChange={(event) =>
-                          updateProjectLayer(layer.id, { name: event.target.value })
+                          updateProjectLayer(layer.id, {
+                            name: event.target.value,
+                          })
                         }
                       />
                       <small>{layer.objects.length}</small>
                       <ChevronRight
-                        className={expandedProjectLayers.has(layer.id) ? "expanded" : ""}
+                        className={
+                          expandedProjectLayers.has(layer.id) ? "expanded" : ""
+                        }
                         size={13}
                       />
                       <button
-                        className={layer.locked ? "icon-button active" : "icon-button"}
+                        className={
+                          layer.locked ? "icon-button active" : "icon-button"
+                        }
                         title={layer.locked ? "Unlock layer" : "Lock layer"}
                         onClick={(event) => {
                           event.stopPropagation();
-                          updateProjectLayer(layer.id, { locked: !layer.locked });
+                          updateProjectLayer(layer.id, {
+                            locked: !layer.locked,
+                          });
                         }}
                       >
                         {layer.locked ? "🔒" : "🔓"}
@@ -984,10 +1013,14 @@ export default function App() {
                                   checked={subLayer.visible}
                                   onChange={(event) =>
                                     updateProjectLayer(layer.id, {
-                                      designLayers: layer.designLayers.map((item) =>
-                                        item.kind === subLayer.kind
-                                          ? { ...item, visible: event.target.checked }
-                                          : item,
+                                      designLayers: layer.designLayers.map(
+                                        (item) =>
+                                          item.kind === subLayer.kind
+                                            ? {
+                                                ...item,
+                                                visible: event.target.checked,
+                                              }
+                                            : item,
                                       ),
                                     })
                                   }
@@ -1012,7 +1045,11 @@ export default function App() {
                                   </span>
                                   <small>{objects.length}</small>
                                   <ChevronRight
-                                    className={expandedProjectKinds.has(key) ? "expanded" : ""}
+                                    className={
+                                      expandedProjectKinds.has(key)
+                                        ? "expanded"
+                                        : ""
+                                    }
                                     size={12}
                                   />
                                 </button>
@@ -1030,15 +1067,23 @@ export default function App() {
                                   }}
                                   onChange={(event) =>
                                     updateProjectLayer(layer.id, {
-                                      designLayers: layer.designLayers.map((item) =>
-                                        item.kind === subLayer.kind
-                                          ? { ...item, opacity: Number(event.target.value) }
-                                          : item,
+                                      designLayers: layer.designLayers.map(
+                                        (item) =>
+                                          item.kind === subLayer.kind
+                                            ? {
+                                                ...item,
+                                                opacity: Number(
+                                                  event.target.value,
+                                                ),
+                                              }
+                                            : item,
                                       ),
                                     })
                                   }
                                 />
-                                <span>{Math.round(subLayer.opacity * 100)}%</span>
+                                <span>
+                                  {Math.round(subLayer.opacity * 100)}%
+                                </span>
                               </label>
                               {expandedProjectKinds.has(key) && (
                                 <div className="project-layer-objects">
@@ -1088,158 +1133,168 @@ export default function App() {
                 ))}
                 {currentProjectExpanded && (
                   <div className="current-project-contents">
-                <div className="layer-group-label">Current object layers</div>
-                <button
-                  className="wide import-layer"
-                  onClick={() => file.current?.click()}
-                >
-                  <Plus size={14} /> Import GeoJSON
-                </button>
-                {layerOrder.map((k, index) => {
-                  const Icon = icons[k];
-                  return (
-                    <div key={k} className="layer-card">
-                      <div className="layer">
-                        <input
-                          aria-label={`Show ${k} layer`}
-                          type="checkbox"
-                          checked={visible[k]}
-                          onChange={(e) => {
-                            const next = { ...visible, [k]: e.target.checked };
-                            setVisible(next);
-                            persistDesignLayers(layerOrder, next, opacity);
-                          }}
-                        />
-                        <Icon size={15} />
-                        <span>
-                          {k === "boundary"
-                            ? "Site boundary"
-                            : k[0].toUpperCase() + k.slice(1)}
-                        </span>
-                        <small>
-                          {project.objects.filter((o) => o.kind === k).length}
-                        </small>
-                        <button
-                          className="icon-button"
-                          aria-label={`Move ${k} layer up`}
-                          disabled={index === 0}
-                          onClick={() => {
-                            const next = [...layerOrder];
-                            [next[index - 1], next[index]] = [
-                              next[index],
-                              next[index - 1],
-                            ];
-                            setLayerOrder(next);
-                            persistDesignLayers(next);
-                          }}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label={`Move ${k} layer down`}
-                          disabled={index === layerOrder.length - 1}
-                          onClick={() => {
-                            const next = [...layerOrder];
-                            [next[index], next[index + 1]] = [
-                              next[index + 1],
-                              next[index],
-                            ];
-                            setLayerOrder(next);
-                            persistDesignLayers(next);
-                          }}
-                        >
-                          ↓
-                        </button>
+                    <div className="layer-group-label">
+                      Current object layers
+                    </div>
+                    <button
+                      className="wide import-layer"
+                      onClick={() => file.current?.click()}
+                    >
+                      <Plus size={14} /> Import GeoJSON
+                    </button>
+                    {layerOrder.map((k, index) => {
+                      const Icon = icons[k];
+                      return (
+                        <div key={k} className="layer-card">
+                          <div className="layer">
+                            <input
+                              aria-label={`Show ${k} layer`}
+                              type="checkbox"
+                              checked={visible[k]}
+                              onChange={(e) => {
+                                const next = {
+                                  ...visible,
+                                  [k]: e.target.checked,
+                                };
+                                setVisible(next);
+                                persistDesignLayers(layerOrder, next, opacity);
+                              }}
+                            />
+                            <Icon size={15} />
+                            <span>
+                              {k === "boundary"
+                                ? "Site boundary"
+                                : k[0].toUpperCase() + k.slice(1)}
+                            </span>
+                            <small>
+                              {
+                                project.objects.filter((o) => o.kind === k)
+                                  .length
+                              }
+                            </small>
+                            <button
+                              className="icon-button"
+                              aria-label={`Move ${k} layer up`}
+                              disabled={index === 0}
+                              onClick={() => {
+                                const next = [...layerOrder];
+                                [next[index - 1], next[index]] = [
+                                  next[index],
+                                  next[index - 1],
+                                ];
+                                setLayerOrder(next);
+                                persistDesignLayers(next);
+                              }}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              className="icon-button"
+                              aria-label={`Move ${k} layer down`}
+                              disabled={index === layerOrder.length - 1}
+                              onClick={() => {
+                                const next = [...layerOrder];
+                                [next[index], next[index + 1]] = [
+                                  next[index + 1],
+                                  next[index],
+                                ];
+                                setLayerOrder(next);
+                                persistDesignLayers(next);
+                              }}
+                            >
+                              ↓
+                            </button>
+                          </div>
+                          <label className="layer-opacity">
+                            Opacity{" "}
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                              value={opacity[k]}
+                              style={{
+                                background: `linear-gradient(to right, #2563eb ${opacity[k] * 100}%, #dbeafe ${opacity[k] * 100}%)`,
+                              }}
+                              onChange={(e) => {
+                                const next = {
+                                  ...opacity,
+                                  [k]: Number(e.target.value),
+                                };
+                                setOpacity(next);
+                                persistDesignLayers(layerOrder, visible, next);
+                              }}
+                            />
+                            <span>{Math.round(opacity[k] * 100)}%</span>
+                          </label>
+                        </div>
+                      );
+                    })}
+                    {project.dataLayers.map((layer) => (
+                      <div key={layer.id} className="layer-card imported-layer">
+                        <div className="layer">
+                          <input
+                            aria-label={`Show ${layer.name} layer`}
+                            type="checkbox"
+                            checked={layer.visible}
+                            onChange={(e) =>
+                              updateDataLayer(layer.id, {
+                                visible: e.target.checked,
+                              })
+                            }
+                          />
+                          <Layers size={15} />
+                          <span title={layer.name}>{layer.name}</span>
+                          <small>{layer.features.length}</small>
+                          <input
+                            aria-label={`${layer.name} color`}
+                            className="layer-color"
+                            type="color"
+                            value={layer.color}
+                            onChange={(e) =>
+                              updateDataLayer(layer.id, {
+                                color: e.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            className="icon-button"
+                            aria-label={`Delete ${layer.name} layer`}
+                            onClick={() => {
+                              setProject((p) => ({
+                                ...p,
+                                dataLayers: p.dataLayers.filter(
+                                  (x) => x.id !== layer.id,
+                                ),
+                              }));
+                              version.current++;
+                              setStatus("Unsaved");
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <label className="layer-opacity">
+                          Opacity
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={layer.opacity}
+                            style={{
+                              background: `linear-gradient(to right, #2563eb ${layer.opacity * 100}%, #dbeafe ${layer.opacity * 100}%)`,
+                            }}
+                            onChange={(e) =>
+                              updateDataLayer(layer.id, {
+                                opacity: Number(e.target.value),
+                              })
+                            }
+                          />
+                          <span>{Math.round(layer.opacity * 100)}%</span>
+                        </label>
                       </div>
-                      <label className="layer-opacity">
-                        Opacity{" "}
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.05"
-                          value={opacity[k]}
-                          style={{
-                            background: `linear-gradient(to right, #2563eb ${opacity[k] * 100}%, #dbeafe ${opacity[k] * 100}%)`,
-                          }}
-                          onChange={(e) => {
-                            const next = {
-                              ...opacity,
-                              [k]: Number(e.target.value),
-                            };
-                            setOpacity(next);
-                            persistDesignLayers(layerOrder, visible, next);
-                          }}
-                        />
-                        <span>{Math.round(opacity[k] * 100)}%</span>
-                      </label>
-                    </div>
-                  );
-                })}
-                {project.dataLayers.map((layer) => (
-                  <div key={layer.id} className="layer-card imported-layer">
-                    <div className="layer">
-                      <input
-                        aria-label={`Show ${layer.name} layer`}
-                        type="checkbox"
-                        checked={layer.visible}
-                        onChange={(e) =>
-                          updateDataLayer(layer.id, {
-                            visible: e.target.checked,
-                          })
-                        }
-                      />
-                      <Layers size={15} />
-                      <span title={layer.name}>{layer.name}</span>
-                      <small>{layer.features.length}</small>
-                      <input
-                        aria-label={`${layer.name} color`}
-                        className="layer-color"
-                        type="color"
-                        value={layer.color}
-                        onChange={(e) =>
-                          updateDataLayer(layer.id, { color: e.target.value })
-                        }
-                      />
-                      <button
-                        className="icon-button"
-                        aria-label={`Delete ${layer.name} layer`}
-                        onClick={() => {
-                          setProject((p) => ({
-                            ...p,
-                            dataLayers: p.dataLayers.filter(
-                              (x) => x.id !== layer.id,
-                            ),
-                          }));
-                          version.current++;
-                          setStatus("Unsaved");
-                        }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                    <label className="layer-opacity">
-                      Opacity
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={layer.opacity}
-                        style={{
-                          background: `linear-gradient(to right, #2563eb ${layer.opacity * 100}%, #dbeafe ${layer.opacity * 100}%)`,
-                        }}
-                        onChange={(e) =>
-                          updateDataLayer(layer.id, {
-                            opacity: Number(e.target.value),
-                          })
-                        }
-                      />
-                      <span>{Math.round(layer.opacity * 100)}%</span>
-                    </label>
-                  </div>
-                ))}
+                    ))}
                   </div>
                 )}
               </div>
@@ -1365,6 +1420,7 @@ export default function App() {
             onContext={setContext}
             action={action}
             navigationMode={tool === "hand"}
+            viewMode={viewMode}
           />
           <div className="map-top">
             <div className="map-actions">
@@ -1415,11 +1471,24 @@ export default function App() {
               </button>
             </div>
             <div className="view-switch">
-              <button onClick={() => frame(undefined, "top")}>2D</button>
-              <button onClick={() => frame(undefined, "perspective")}>
+              <button
+                className={viewMode === "2d" ? "active" : ""}
+                onClick={() => frame(undefined, "top")}
+              >
+                2D
+              </button>
+              <button
+                className={viewMode === "3d" ? "active" : ""}
+                onClick={() => frame(undefined, "perspective")}
+              >
                 3D
               </button>
-              <button onClick={() => frame(undefined, "street")}>Street</button>
+              <button
+                className={viewMode === "street" ? "active" : ""}
+                onClick={() => frame(undefined, "street")}
+              >
+                Street
+              </button>
             </div>
           </div>
           {toolsOpen ? (
@@ -1571,6 +1640,68 @@ export default function App() {
               <Minus size={16} />
             </button>
           </div>
+          {viewMode === "street" && (
+            <div className="street-controls" aria-label="Street view controls">
+              <span>LOOK</span>
+              <div className="street-control-grid">
+                <button
+                  aria-label="Tilt view up"
+                  title="Look up"
+                  onClick={() =>
+                    setAction({ type: "tilt-up", seq: Date.now() })
+                  }
+                >
+                  ↑
+                </button>
+                <button
+                  aria-label="Rotate view left"
+                  title="Turn left"
+                  onClick={() =>
+                    setAction({ type: "rotate-left", seq: Date.now() })
+                  }
+                >
+                  ↶
+                </button>
+                <button
+                  aria-label="Move forward"
+                  title="Move forward"
+                  onClick={() =>
+                    setAction({ type: "move-forward", seq: Date.now() })
+                  }
+                >
+                  ▲
+                </button>
+                <button
+                  aria-label="Rotate view right"
+                  title="Turn right"
+                  onClick={() =>
+                    setAction({ type: "rotate-right", seq: Date.now() })
+                  }
+                >
+                  ↷
+                </button>
+                <button
+                  aria-label="Tilt view down"
+                  title="Look down"
+                  onClick={() =>
+                    setAction({ type: "tilt-down", seq: Date.now() })
+                  }
+                >
+                  ↓
+                </button>
+                <button
+                  aria-label="Move backward"
+                  title="Move backward"
+                  onClick={() =>
+                    setAction({ type: "move-backward", seq: Date.now() })
+                  }
+                >
+                  ▼
+                </button>
+              </div>
+              <small>5 m move · 12° turn</small>
+            </div>
+          )}
           {tool !== "select" && tool !== "hand" && (
             <div className="drawing-hint">
               <b>
@@ -1603,7 +1734,7 @@ export default function App() {
             </div>
           )}
           {error && (
-            <div role="alert" className="error">
+            <div role="alert" aria-live="assertive" className="error">
               <span>{error}</span>
               <button aria-label="Dismiss error" onClick={() => setError("")}>
                 <X size={16} />
@@ -1922,8 +2053,10 @@ export default function App() {
                   Open as separate project
                 </button>
                 {pendingProject &&
-                  Math.abs(pendingProject.origin[0] - project.origin[0]) < 0.0001 &&
-                  Math.abs(pendingProject.origin[1] - project.origin[1]) < 0.0001 && (
+                  Math.abs(pendingProject.origin[0] - project.origin[0]) <
+                    0.0001 &&
+                  Math.abs(pendingProject.origin[1] - project.origin[1]) <
+                    0.0001 && (
                     <button onClick={() => addProjectLayer(pendingProject)}>
                       Add as separate project
                     </button>

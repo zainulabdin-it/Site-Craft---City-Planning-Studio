@@ -17,7 +17,13 @@ export type ViewAction = {
     | "street"
     | "location"
     | "zoom-in"
-    | "zoom-out";
+    | "zoom-out"
+    | "rotate-left"
+    | "rotate-right"
+    | "tilt-up"
+    | "tilt-down"
+    | "move-forward"
+    | "move-backward";
   id?: string;
   location?: {
     center: Point;
@@ -39,6 +45,7 @@ interface Props {
   action: ViewAction;
   onContext: (s: string) => void;
   navigationMode: boolean;
+  viewMode: "2d" | "3d" | "street";
 }
 export function Viewport(props: Props) {
   const [assetVersion, setAssetVersion] = useState(0);
@@ -46,7 +53,8 @@ export function Viewport(props: Props) {
     viewer = useRef<C.Viewer | null>(null),
     latest = useRef(props),
     cache = useRef(new Map<string, DesignObject>()),
-    opacityCache = useRef(new Map<string, number>());
+    opacityCache = useRef(new Map<string, number>()),
+    modeCache = useRef("");
   latest.current = props;
   useEffect(() => {
     let active = true;
@@ -311,6 +319,12 @@ export function Viewport(props: Props) {
     const v = viewer.current;
     if (!v) return;
     const p = props.project;
+    const is2D = props.viewMode === "2d";
+    if (modeCache.current !== props.viewMode) {
+      cache.current.clear();
+      opacityCache.current.clear();
+      modeCache.current = props.viewMode;
+    }
     const objectOpacity = (object: DesignObject) =>
       props.opacity[object.kind] * (props.objectOpacity?.[object.id] ?? 1);
     const position = (xy: Point, z = 0) =>
@@ -390,10 +404,16 @@ export function Viewport(props: Props) {
             o.kind === "boundary" ? 0 : o.elevation + 0.15,
             0,
             (o.kind === "boundary"
-              ? C.Color.fromCssColorString("#eaf4dc")
+              ? C.Color.fromCssColorString(is2D ? "#f3efe7" : "#eaf4dc")
               : color
             ).withAlpha(
-              (o.kind === "boundary" ? 0.88 : 0.62) * objectOpacity(o),
+              (o.kind === "boundary"
+                ? is2D
+                  ? 0.035
+                  : 0.88
+                : is2D
+                  ? 0.22
+                  : 0.62) * objectOpacity(o),
             ),
           );
           if (water)
@@ -405,8 +425,10 @@ export function Viewport(props: Props) {
               });
           e.polyline = {
             positions: [...o.points, o.points[0]].map((q) => position(q, 0.3)),
-            width: o.kind === "boundary" ? 3 : 2,
-            material: C.Color.fromCssColorString("#25b895"),
+            width: o.kind === "boundary" ? (is2D ? 2 : 3) : is2D ? 1 : 2,
+            material: C.Color.fromCssColorString(
+              is2D ? "#78a899" : "#25b895",
+            ).withAlpha(is2D ? (o.kind === "boundary" ? 0.42 : 0.58) : 1),
           };
           if (o.kind === "plot" && o.name.toLowerCase().includes("parking")) {
             const xs = o.points.map(([x]) => x),
@@ -431,7 +453,11 @@ export function Viewport(props: Props) {
               });
             }
           }
-          if (o.kind === "plot" && o.assetRef === "builtin:society:graveyard") {
+          if (
+            !is2D &&
+            o.kind === "plot" &&
+            o.assetRef === "builtin:society:graveyard"
+          ) {
             const xs = o.points.map(([x]) => x),
               ys = o.points.map(([, y]) => y),
               minX = Math.min(...xs),
@@ -470,6 +496,7 @@ export function Viewport(props: Props) {
             });
           }
           if (
+            !is2D &&
             o.kind === "plot" &&
             o.assetRef === "builtin:society:playground"
           ) {
@@ -527,7 +554,26 @@ export function Viewport(props: Props) {
           };
           const houseUri = houseUris[variant] ?? houseUris.f;
           const houseScale = ((o.width + o.depth) / 4) * o.scale * 1.35;
-          if (customUri) {
+          if (is2D) {
+            const mapColor =
+              o.buildingType === "Detached house" ||
+              o.buildingType === "Townhouse"
+                ? C.Color.fromCssColorString("#cbbfb1")
+                : color;
+            e.polygon = polygon(
+              footprint(o),
+              o.elevation + 0.22,
+              0.16,
+              mapColor.withAlpha(0.78 * objectOpacity(o)),
+            );
+            const flat = e.polygon as C.Entity.ConstructorOptions["polygon"];
+            if (flat) {
+              flat.outline = true;
+              flat.outlineColor = C.Color.fromCssColorString(
+                "#9f978d",
+              ).withAlpha(objectOpacity(o));
+            }
+          } else if (customUri) {
             e.position = position(o.points[0], o.elevation + 0.15);
             e.orientation = C.Transforms.headingPitchRollQuaternion(
               position(o.points[0]),
@@ -771,67 +817,96 @@ export function Viewport(props: Props) {
             new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
           );
           if (o.kind === "tree") {
-            const palm = variant === "palm",
-              columnar = variant === "columnar";
-            if (!palm && !columnar) {
-              const treeScale = 6.2 * scale;
-              e.position = position(o.points[0], z + 0.15);
-              e.model = model(
-                variant === "small"
-                  ? "/assets/kenney/suburban/tree-small.glb"
-                  : "/assets/kenney/suburban/tree-large.glb",
-                treeScale,
-                objectOpacity(o),
-                selected,
-                20,
-                C.Color.fromCssColorString(
-                  variant === "small" ? "#75dc22" : "#4fcb21",
-                ),
-                0.1,
-              );
-            } else {
-              e.ellipsoid = {
-                radii: new C.Cartesian3(
-                  (palm ? 2.8 : 1.8) * scale,
-                  (palm ? 2.8 : 1.8) * scale,
-                  (palm ? 1.5 : 5.2) * scale,
-                ),
-                material: C.Color.fromCssColorString("#2f7d4f").withAlpha(
+            if (is2D) {
+              e.position = position(o.points[0], z + 0.28);
+              e.ellipse = {
+                semiMajorAxis: 3.2 * scale,
+                semiMinorAxis: 3.2 * scale,
+                material: C.Color.fromCssColorString(
+                  variant === "columnar" ? "#568a4c" : "#72a963",
+                ).withAlpha(0.82 * objectOpacity(o)),
+                outline: true,
+                outlineColor: C.Color.fromCssColorString("#4f7b47").withAlpha(
                   objectOpacity(o),
                 ),
               };
-              v.entities.add({
-                id: `${o.id}:trunk`,
-                position: position(o.points[0], z + (palm ? 4 : 2.1) * scale),
-                cylinder: {
-                  length: (palm ? 8 : 4.2) * scale,
-                  topRadius: (palm ? 0.22 : 0.32) * scale,
-                  bottomRadius: (palm ? 0.42 : 0.48) * scale,
-                  material: C.Color.fromCssColorString("#79563d").withAlpha(
+            } else {
+              const palm = variant === "palm",
+                columnar = variant === "columnar";
+              if (!palm && !columnar) {
+                const treeScale = 6.2 * scale;
+                e.position = position(o.points[0], z + 0.15);
+                e.model = model(
+                  variant === "small"
+                    ? "/assets/kenney/suburban/tree-small.glb"
+                    : "/assets/kenney/suburban/tree-large.glb",
+                  treeScale,
+                  objectOpacity(o),
+                  selected,
+                  20,
+                  C.Color.fromCssColorString(
+                    variant === "small" ? "#75dc22" : "#4fcb21",
+                  ),
+                  0.1,
+                );
+              } else {
+                e.ellipsoid = {
+                  radii: new C.Cartesian3(
+                    (palm ? 2.8 : 1.8) * scale,
+                    (palm ? 2.8 : 1.8) * scale,
+                    (palm ? 1.5 : 5.2) * scale,
+                  ),
+                  material: C.Color.fromCssColorString("#2f7d4f").withAlpha(
                     objectOpacity(o),
                   ),
-                },
-              });
+                };
+                v.entities.add({
+                  id: `${o.id}:trunk`,
+                  position: position(o.points[0], z + (palm ? 4 : 2.1) * scale),
+                  cylinder: {
+                    length: (palm ? 8 : 4.2) * scale,
+                    topRadius: (palm ? 0.22 : 0.32) * scale,
+                    bottomRadius: (palm ? 0.42 : 0.48) * scale,
+                    material: C.Color.fromCssColorString("#79563d").withAlpha(
+                      objectOpacity(o),
+                    ),
+                  },
+                });
+              }
             }
           } else {
             if (o.kind === "car") {
-              const carUri =
-                variant === "van"
-                  ? "/assets/kenney/cars/van.glb"
-                  : variant === "suv"
-                    ? "/assets/kenney/cars/suv.glb"
-                    : "/assets/kenney/cars/sedan.glb";
-              const carScale = 2.25 * scale;
-              e.position = position(o.points[0], z + 0.25);
-              e.model = model(
-                carUri,
-                carScale,
-                objectOpacity(o),
-                selected,
-                18,
-                C.Color.fromCssColorString(o.color),
-                0.28,
-              );
+              if (is2D) {
+                e.position = position(o.points[0], z + 0.3);
+                e.box = {
+                  dimensions: new C.Cartesian3(4.2 * scale, 1.8 * scale, 0.12),
+                  material: C.Color.fromCssColorString(o.color).withAlpha(
+                    0.82 * objectOpacity(o),
+                  ),
+                  outline: true,
+                  outlineColor: C.Color.fromCssColorString("#ffffff").withAlpha(
+                    0.8 * objectOpacity(o),
+                  ),
+                };
+              } else {
+                const carUri =
+                  variant === "van"
+                    ? "/assets/kenney/cars/van.glb"
+                    : variant === "suv"
+                      ? "/assets/kenney/cars/suv.glb"
+                      : "/assets/kenney/cars/sedan.glb";
+                const carScale = 2.25 * scale;
+                e.position = position(o.points[0], z + 0.25);
+                e.model = model(
+                  carUri,
+                  carScale,
+                  objectOpacity(o),
+                  selected,
+                  18,
+                  C.Color.fromCssColorString(o.color),
+                  0.28,
+                );
+              }
             } else if (o.assetRef === "builtin:society:streetlight") {
               e.position = position(o.points[0], z + 4 * scale);
               e.box = {
@@ -1113,8 +1188,11 @@ export function Viewport(props: Props) {
           o.id === props.selected
             ? new C.ColorMaterialProperty(C.Color.fromCssColorString("#f8b84b"))
             : new C.PolylineDashMaterialProperty({
-                color: C.Color.WHITE.withAlpha(objectOpacity(o)),
-                dashLength: 18,
+                color: (is2D
+                  ? C.Color.fromCssColorString("#aeb5b7")
+                  : C.Color.WHITE
+                ).withAlpha(objectOpacity(o)),
+                dashLength: is2D ? 14 : 18,
               });
     }
     // A single transient highlight avoids mutating stored design objects.
@@ -1197,6 +1275,7 @@ export function Viewport(props: Props) {
     props.draft,
     props.navigationMode,
     assetVersion,
+    props.viewMode,
   ]);
   useEffect(() => {
     const v = viewer.current;
@@ -1285,11 +1364,12 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    let cancelled = false;
     const w = new Worker(new URL("./geometry.worker.ts", import.meta.url), {
       type: "module",
     });
     w.onmessage = ({ data }) => {
-      if (v.isDestroyed()) return;
+      if (cancelled || v.isDestroyed()) return;
       if (data.error) {
         props.onError(data.error);
         return;
@@ -1315,9 +1395,9 @@ export function Viewport(props: Props) {
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
               height: s.elevation + 0.08,
-              material: C.Color.fromCssColorString("#d9d7cf").withAlpha(
-                props.opacity.road,
-              ),
+              material: C.Color.fromCssColorString(
+                props.viewMode === "2d" ? "#f4f3ef" : "#d9d7cf",
+              ).withAlpha(props.opacity.road),
             },
           });
         }
@@ -1337,9 +1417,9 @@ export function Viewport(props: Props) {
                   .map((r: Point[]) => new C.PolygonHierarchy(ring(r))),
               ),
               height: s.elevation + 0.14,
-              material: C.Color.fromCssColorString("#3f474d").withAlpha(
-                props.opacity.road,
-              ),
+              material: C.Color.fromCssColorString(
+                props.viewMode === "2d" ? "#d7d9d8" : "#3f474d",
+              ).withAlpha(props.opacity.road),
             },
           });
         }
@@ -1350,8 +1430,12 @@ export function Viewport(props: Props) {
       id: 1,
       roads: props.project.objects.filter((o) => o.kind === "road"),
     });
-    return () => w.terminate();
-  }, [roadKey, props.visible.road, props.opacity.road]);
+    return () => {
+      cancelled = true;
+      w.onmessage = null;
+      w.terminate();
+    };
+  }, [roadKey, props.visible.road, props.opacity.road, props.viewMode]);
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
@@ -1360,6 +1444,29 @@ export function Viewport(props: Props) {
         amount = Math.max(2, height * 0.35);
       if (props.action.type === "zoom-in") v.camera.zoomIn(amount);
       else v.camera.zoomOut(amount);
+      v.scene.requestRender();
+      return;
+    }
+    const cameraStep = 5;
+    const turnStep = C.Math.toRadians(12);
+    if (props.action.type === "rotate-left") v.camera.lookLeft(turnStep);
+    else if (props.action.type === "rotate-right") v.camera.lookRight(turnStep);
+    else if (props.action.type === "tilt-up") v.camera.lookUp(turnStep / 2);
+    else if (props.action.type === "tilt-down") v.camera.lookDown(turnStep / 2);
+    else if (props.action.type === "move-forward")
+      v.camera.moveForward(cameraStep);
+    else if (props.action.type === "move-backward")
+      v.camera.moveBackward(cameraStep);
+    if (
+      [
+        "rotate-left",
+        "rotate-right",
+        "tilt-up",
+        "tilt-down",
+        "move-forward",
+        "move-backward",
+      ].includes(props.action.type)
+    ) {
       v.scene.requestRender();
       return;
     }
