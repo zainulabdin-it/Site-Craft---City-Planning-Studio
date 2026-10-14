@@ -111,6 +111,47 @@ header {
   gap: 2px;
   white-space: nowrap;
 }
+.top-menu {
+  position: relative;
+}
+.top-nav > .top-menu > button.active {
+  color: #1d4ed8;
+  background: #e8f0ff;
+}
+.top-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 70;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid #dce4dd;
+  border-radius: 9px;
+  background: white;
+  box-shadow: 0 12px 34px #17255425;
+}
+.top-menu-popover button {
+  width: 100%;
+  min-height: 34px;
+  justify-content: space-between;
+  padding: 7px 9px;
+  border: 0;
+  text-align: left;
+}
+.top-menu-popover button:hover:not(:disabled) {
+  background: #f0f5ff;
+}
+.top-menu-popover i {
+  display: block;
+  height: 1px;
+  margin: 5px 4px;
+  background: #e5ebe6;
+}
+.top-menu-popover kbd {
+  color: #819087;
+  font-family: inherit;
+  font-size: 9px;
+}
 .top-nav button {
   border: 0;
   background: transparent;
@@ -1186,6 +1227,47 @@ main {
 .site-analysis-backdrop {
   z-index: 80;
 }
+.object-setup-backdrop {
+  z-index: 75;
+}
+.object-setup-modal {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.object-setup-modal .modal-header small {
+  color: #688076;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.object-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 10px;
+}
+.object-setup-grid .wide {
+  grid-column: span 2;
+}
+.object-setup-grid .color-field input {
+  min-height: 36px;
+}
+.object-setup-modal > .modal-actions {
+  position: sticky;
+  bottom: -28px;
+  margin: 18px -28px -28px;
+  padding: 14px 28px 20px;
+  background: white;
+  box-shadow: 0 -8px 18px #1734290d;
+}
+@media (max-width: 650px) {
+  .object-setup-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .object-setup-grid .wide {
+    grid-column: 1 / -1;
+  }
+}
 .site-analysis-modal {
   width: min(680px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
@@ -1609,6 +1691,10 @@ footer {
   display: grid;
   place-items: center;
   z-index: 20;
+}
+.modal-backdrop.site-analysis-backdrop,
+.modal-backdrop.object-setup-backdrop {
+  z-index: 90;
 }
 .modal {
   width: min(480px, calc(100vw - 32px));

@@ -156,6 +156,13 @@ export default function App() {
     [undo, setUndo] = useState<Command[]>([]),
     [redo, setRedo] = useState<Command[]>([]),
     [action, setAction] = useState<ViewAction>({ type: "frame", seq: 0 }),
+    [activeMenu, setActiveMenu] = useState<"project" | "edit" | "view" | null>(
+      null,
+    ),
+    [placementDialog, setPlacementDialog] = useState<{
+      object: DesignObject;
+      command: string;
+    } | null>(null),
     [siteAnalysis, setSiteAnalysis] = useState<{
       status: "loading" | "ready";
       boundary: Point[];
@@ -202,6 +209,10 @@ export default function App() {
     projectFile = useRef<HTMLInputElement>(null),
     version = useRef(0);
   const current = project.objects.find((o) => o.id === selected);
+  const updatePlacementObject = (changes: Partial<DesignObject>) =>
+    setPlacementDialog((dialog) =>
+      dialog ? { ...dialog, object: { ...dialog.object, ...changes } } : dialog,
+    );
   const refreshAssets = () =>
     listCustomAssets()
       .then(setCustomAssets)
@@ -292,10 +303,37 @@ export default function App() {
         e.preventDefault();
         history(!e.shiftKey);
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void save();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        setName("New Christchurch site");
+        setDialog("new");
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  const confirmPlacement = () => {
+    if (!placementDialog) return;
+    const o = placementDialog.object,
+      updates = o.kind === "road" ? connectRoad(o, project.objects) : [o];
+    if (!edit(updates, [], placementDialog.command)) return;
+    setSelected(o.id);
+    setPlacementDialog(null);
+    setPlacementAsset(null);
+    cancel();
+    if (o.kind === "boundary") {
+      frame(o.id, "top");
+      const boundary = o.points.map((point) => [...point] as Point);
+      setSiteAnalysis({ status: "loading", boundary });
+      void analyzeSite(boundary, project.origin).then((result) =>
+        setSiteAnalysis({ status: "ready", boundary, result }),
+      );
+    }
+  };
   const finish = () => {
     if (!["boundary", "road", "plot", "freehand"].includes(tool)) return;
     const objectKind = tool === "freehand" ? "plot" : tool;
@@ -307,19 +345,7 @@ export default function App() {
         1;
       o.name = `Site ${siteNumber} boundary`;
     }
-    const updates = tool === "road" ? connectRoad(o, project.objects) : [o];
-    if (edit(updates, [], `Draw ${tool}`)) {
-      setSelected(o.id);
-      cancel();
-      if (tool === "boundary") {
-        frame(o.id, "top");
-        const boundary = o.points.map((point) => [...point] as Point);
-        setSiteAnalysis({ status: "loading", boundary });
-        void analyzeSite(boundary, project.origin).then((result) =>
-          setSiteAnalysis({ status: "ready", boundary, result }),
-        );
-      }
-    }
+    setPlacementDialog({ object: o, command: `Draw ${tool}` });
   };
   const click = (p: Point, id?: string) => {
     if (tool === "hand") return;
@@ -388,11 +414,10 @@ export default function App() {
         Math.max(2, placementAsset.height / o.floors),
       );
       o.roof = "pitched";
-      if (edit([o], [], `Place ${placementAsset.name}`)) {
-        setSelected(o.id);
-        setTool("select");
-        setPlacementAsset(null);
-      }
+      setPlacementDialog({
+        object: o,
+        command: `Place ${placementAsset.name}`,
+      });
       return;
     }
     if (tool === "rectangle" || tool === "circle") {
@@ -414,10 +439,8 @@ export default function App() {
             });
       const shape = newObject(project, "plot", points);
       shape.name = tool === "rectangle" ? "Rectangle" : "Circle";
-      if (edit([shape], [], `Draw ${tool}`)) {
-        setSelected(shape.id);
-        setDraft([]);
-      }
+      setDraft([]);
+      setPlacementDialog({ object: shape, command: `Draw ${tool}` });
       return;
     }
     if (["boundary", "road", "plot", "freehand"].includes(tool)) {
@@ -426,7 +449,7 @@ export default function App() {
       return;
     }
     const o = newObject(project, tool as Kind, [p]);
-    if (edit([o], [], `Place ${tool}`)) setSelected(o.id);
+    setPlacementDialog({ object: o, command: `Place ${tool}` });
   };
   const updateConnected = (o: DesignObject) => {
     const updates = [o];
@@ -714,20 +737,168 @@ export default function App() {
           <span className="studio">PLANNING STUDIO</span>
         </div>
         <nav className="top-nav" aria-label="Application menu">
-          <button
-            onClick={() => {
-              setName("New Christchurch site");
-              setDialog("new");
-            }}
-          >
-            <FolderOpen size={16} /> Project
-          </button>
-          <button onClick={() => setTool("select")}>
-            <MousePointer2 size={16} /> Edit
-          </button>
-          <button onClick={() => setAction({ type: "top", seq: Date.now() })}>
-            <Compass size={16} /> View
-          </button>
+          <div className="top-menu">
+            <button
+              className={activeMenu === "project" ? "active" : ""}
+              onClick={() =>
+                setActiveMenu(activeMenu === "project" ? null : "project")
+              }
+            >
+              <FolderOpen size={16} /> Project
+            </button>
+            {activeMenu === "project" && (
+              <div className="top-menu-popover">
+                <button
+                  onClick={() => {
+                    setName("New Christchurch site");
+                    setDialog("new");
+                    setActiveMenu(null);
+                  }}
+                >
+                  New project <kbd>Ctrl+N</kbd>
+                </button>
+                <button
+                  onClick={() => {
+                    void open();
+                    setActiveMenu(null);
+                  }}
+                >
+                  Open saved
+                </button>
+                <button
+                  onClick={() => {
+                    projectFile.current?.click();
+                    setActiveMenu(null);
+                  }}
+                >
+                  Open computer file
+                </button>
+                <i />
+                <button
+                  onClick={() => {
+                    void save();
+                    setActiveMenu(null);
+                  }}
+                >
+                  Save project <kbd>Ctrl+S</kbd>
+                </button>
+                <button
+                  onClick={() => {
+                    void saveToComputer(project);
+                    setActiveMenu(null);
+                  }}
+                >
+                  Save to computer
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="top-menu">
+            <button
+              className={activeMenu === "edit" ? "active" : ""}
+              onClick={() =>
+                setActiveMenu(activeMenu === "edit" ? null : "edit")
+              }
+            >
+              <MousePointer2 size={16} /> Edit
+            </button>
+            {activeMenu === "edit" && (
+              <div className="top-menu-popover">
+                <button
+                  disabled={!undo.length}
+                  onClick={() => {
+                    history(true);
+                    setActiveMenu(null);
+                  }}
+                >
+                  Undo <kbd>Ctrl+Z</kbd>
+                </button>
+                <button
+                  disabled={!redo.length}
+                  onClick={() => {
+                    history(false);
+                    setActiveMenu(null);
+                  }}
+                >
+                  Redo <kbd>Ctrl+Shift+Z</kbd>
+                </button>
+                <i />
+                <button
+                  onClick={() => {
+                    setTool("select");
+                    setActiveMenu(null);
+                  }}
+                >
+                  Select tool
+                </button>
+                <button
+                  disabled={!current}
+                  onClick={() => {
+                    if (current && edit([], [current.id], "Delete object"))
+                      setSelected("");
+                    setActiveMenu(null);
+                  }}
+                >
+                  Delete selected
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="top-menu">
+            <button
+              className={activeMenu === "view" ? "active" : ""}
+              onClick={() =>
+                setActiveMenu(activeMenu === "view" ? null : "view")
+              }
+            >
+              <Compass size={16} /> View
+            </button>
+            {activeMenu === "view" && (
+              <div className="top-menu-popover">
+                <button
+                  onClick={() => (frame(undefined, "top"), setActiveMenu(null))}
+                >
+                  2D map
+                </button>
+                <button
+                  onClick={() => (
+                    frame(undefined, "perspective"),
+                    setActiveMenu(null)
+                  )}
+                >
+                  3D perspective
+                </button>
+                <button
+                  onClick={() => (
+                    frame(undefined, "street"),
+                    setActiveMenu(null)
+                  )}
+                >
+                  Street view
+                </button>
+                <i />
+                <button onClick={() => (frame(), setActiveMenu(null))}>
+                  Frame whole project
+                </button>
+                <button
+                  onClick={() => {
+                    setLeftOpen((open) => !open);
+                    setActiveMenu(null);
+                  }}
+                >
+                  Toggle layers panel
+                </button>
+                <button
+                  onClick={() => {
+                    setRightOpen((open) => !open);
+                    setActiveMenu(null);
+                  }}
+                >
+                  Toggle inspector
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
         <div className="project-title">
           {project.name}
@@ -2184,6 +2355,288 @@ export default function App() {
                 </div>
               </>
             )}
+          </section>
+        </div>
+      )}
+      {placementDialog && (
+        <div className="modal-backdrop object-setup-backdrop">
+          <section
+            role="dialog"
+            aria-label={`Configure ${placementDialog.object.kind}`}
+            className="modal object-setup-modal"
+          >
+            <div className="modal-header">
+              <div>
+                <small>NEW {placementDialog.object.kind.toUpperCase()}</small>
+                <h2>Object settings</h2>
+                <p className="muted">
+                  Check the default values before placing this object.
+                </p>
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Cancel object placement"
+                onClick={() => {
+                  setPlacementDialog(null);
+                  setPlacementAsset(null);
+                  setDraft([]);
+                  setTool("select");
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="object-setup-grid">
+              <label className="field wide">
+                Object name
+                <input
+                  autoFocus
+                  value={placementDialog.object.name}
+                  maxLength={100}
+                  onChange={(event) =>
+                    updatePlacementObject({ name: event.target.value })
+                  }
+                />
+              </label>
+              {["building", "tree", "car", "bench", "bridge"].includes(
+                placementDialog.object.kind,
+              ) && (
+                <label className="field wide">
+                  Design / shape
+                  <select
+                    value={placementDialog.object.assetRef}
+                    onChange={(event) =>
+                      updatePlacementObject({ assetRef: event.target.value })
+                    }
+                  >
+                    {placementDialog.object.assetRef &&
+                      !placementDialog.object.assetRef.startsWith(
+                        "kenney:",
+                      ) && (
+                        <option value={placementDialog.object.assetRef}>
+                          Selected asset
+                        </option>
+                      )}
+                    {placementDialog.object.kind === "building" && (
+                      <>
+                        <option value="kenney:house:a">House A</option>
+                        <option value="kenney:house:f">House F</option>
+                        <option value="kenney:house:k">House K</option>
+                        <option value="kenney:house:t">House T</option>
+                      </>
+                    )}
+                    {placementDialog.object.kind === "tree" && (
+                      <>
+                        <option value="builtin:tree:large">Large tree</option>
+                        <option value="builtin:tree:small">Small tree</option>
+                        <option value="builtin:tree:palm">Palm</option>
+                        <option value="builtin:tree:columnar">Columnar</option>
+                      </>
+                    )}
+                    {placementDialog.object.kind === "car" && (
+                      <>
+                        <option value="kenney:car:sedan">Sedan</option>
+                        <option value="kenney:car:suv">SUV</option>
+                        <option value="kenney:car:van">Van</option>
+                      </>
+                    )}
+                    {placementDialog.object.kind === "bench" && (
+                      <>
+                        <option value="builtin:bench:classic">Classic</option>
+                        <option value="builtin:bench:modern">Modern</option>
+                        <option value="builtin:bench:wood">Wood</option>
+                      </>
+                    )}
+                    {placementDialog.object.kind === "bridge" && (
+                      <>
+                        <option value="builtin:bridge:suspension">
+                          Suspension
+                        </option>
+                        <option value="builtin:bridge:arch">Arch</option>
+                        <option value="builtin:bridge:truss">Truss</option>
+                      </>
+                    )}
+                  </select>
+                </label>
+              )}
+              {["building", "bridge"].includes(placementDialog.object.kind) && (
+                <>
+                  <label className="field">
+                    Width (m)
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={placementDialog.object.width}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          width: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Depth (m)
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={placementDialog.object.depth}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          depth: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              )}
+              {placementDialog.object.kind === "road" && (
+                <>
+                  <label className="field">
+                    Road width (m)
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={placementDialog.object.width}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          width: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Lanes
+                    <input
+                      type="number"
+                      min="1"
+                      max="8"
+                      value={placementDialog.object.lanes}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          lanes: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              )}
+              {placementDialog.object.kind === "building" && (
+                <>
+                  <label className="field">
+                    Floors
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={placementDialog.object.floors}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          floors: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Floor height (m)
+                    <input
+                      type="number"
+                      min="2"
+                      max="6"
+                      step="0.1"
+                      value={placementDialog.object.floorHeight}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          floorHeight: Number(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Roof
+                    <select
+                      value={placementDialog.object.roof}
+                      onChange={(event) =>
+                        updatePlacementObject({
+                          roof: event.target.value as DesignObject["roof"],
+                        })
+                      }
+                    >
+                      <option value="pitched">Pitched</option>
+                      <option value="flat">Flat</option>
+                    </select>
+                  </label>
+                </>
+              )}
+              {!["boundary", "road", "plot"].includes(
+                placementDialog.object.kind,
+              ) && (
+                <label className="field">
+                  Scale
+                  <input
+                    type="number"
+                    min="0.2"
+                    max="5"
+                    step="0.1"
+                    value={placementDialog.object.scale}
+                    onChange={(event) =>
+                      updatePlacementObject({
+                        scale: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+              )}
+              {!["boundary", "road", "plot"].includes(
+                placementDialog.object.kind,
+              ) && (
+                <label className="field">
+                  Rotation (°)
+                  <input
+                    type="number"
+                    min="-360"
+                    max="360"
+                    value={placementDialog.object.rotation}
+                    onChange={(event) =>
+                      updatePlacementObject({
+                        rotation: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+              )}
+              <label className="field color-field">
+                Color
+                <input
+                  type="color"
+                  value={placementDialog.object.color}
+                  onChange={(event) =>
+                    updatePlacementObject({ color: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={() => {
+                  setPlacementDialog(null);
+                  setPlacementAsset(null);
+                  setDraft([]);
+                  setTool("select");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary"
+                disabled={!placementDialog.object.name.trim()}
+                onClick={confirmPlacement}
+              >
+                Place object
+              </button>
+            </div>
           </section>
         </div>
       )}

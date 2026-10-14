@@ -85,20 +85,23 @@ export const projectLayerSchema = z.object({
   opacity: z.number().min(0).max(1),
   locked: z.boolean(),
   objects: z.array(objectSchema).max(2000),
-  designLayers: z.array(designLayerSchema).length(8).default(() =>
-    (
-      [
-        "boundary",
-        "road",
-        "building",
-        "plot",
-        "tree",
-        "car",
-        "bench",
-        "bridge",
-      ] as const
-    ).map((kind) => ({ kind, visible: true, opacity: 1 })),
-  ),
+  designLayers: z
+    .array(designLayerSchema)
+    .length(8)
+    .default(() =>
+      (
+        [
+          "boundary",
+          "road",
+          "building",
+          "plot",
+          "tree",
+          "car",
+          "bench",
+          "bridge",
+        ] as const
+      ).map((kind) => ({ kind, visible: true, opacity: 1 })),
+    ),
 });
 export type ProjectLayer = z.infer<typeof projectLayerSchema>;
 const projectFields = {
@@ -186,7 +189,7 @@ export function newObject(
     scale: 1,
     elevation: kind === "bridge" ? 5 : 0,
     lanes: 2,
-    roof: "flat",
+    roof: kind === "building" ? "pitched" : "flat",
     buildingType: "Detached house",
     color: kind === "building" ? "#d7c8ae" : "#4b7863",
     assetRef:
