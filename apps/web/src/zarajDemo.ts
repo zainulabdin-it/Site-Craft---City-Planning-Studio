@@ -43,7 +43,8 @@ export function zarajNzProject() {
         roof: floors <= 2 ? "pitched" : "flat",
       });
 
-  p.origin = [172.3305, -43.6815];
+  // Dry north-east Rolleston field; Selwyn Road sits south of the site.
+  p.origin = [172.439, -43.6005];
   p.scenarioName = "Zaraj reference master plan · professional NZ demo";
   add(
     "boundary",
@@ -231,6 +232,7 @@ export function zarajNzProject() {
           (band.sector === "B" && y > -190 && y < 125 && x > 20) ||
           (band.sector === "A" && y > 155 && x > -400) ||
           (band.sector === "A" && y > -205 && y < -135) ||
+          (band.sector === "B" && y === -275 && x < -20) ||
           (band.sector === "C" && y > 75 && y < 140) ||
           (band.sector === "C" && y > 180 && x > 320)
         )
@@ -351,6 +353,70 @@ export function zarajNzProject() {
     0,
     "Place of worship",
   );
+  add(
+    "plot",
+    [
+      [-285, -305],
+      [-30, -305],
+      [-30, -220],
+      [-285, -220],
+    ],
+    "Faith and community precinct",
+    { color: "#d8d2c5", assetRef: "builtin:society:green-space" },
+  );
+  building(
+    -240,
+    -275,
+    "Rolleston Community Church",
+    25,
+    38,
+    "builtin:society:church",
+    "#d8c7a7",
+    2,
+    0,
+    "Place of worship",
+  );
+  building(
+    -155,
+    -275,
+    "Community Hindu Temple",
+    25,
+    25,
+    "builtin:society:temple",
+    "#efb34f",
+    2,
+    0,
+    "Place of worship",
+  );
+  building(
+    -75,
+    -275,
+    "Rolleston Gurdwara",
+    28,
+    24,
+    "builtin:society:gurdwara",
+    "#f4f4ef",
+    2,
+    0,
+    "Place of worship",
+  );
+  [-240, -155, -75].forEach((x, index) => {
+    add(
+      "road",
+      [
+        [x, -255],
+        [x, -219],
+      ],
+      `Faith building access ${index + 1}`,
+      { width: 5, lanes: 1, color: "#59636b" },
+    );
+    add("car", [[x + 18, -238]], `Faith precinct car ${index + 1}`, {
+      rotation: 0,
+      scale: 0.78,
+      color: ["#2878c8", "#f4b942", "#f8f9fa"][index],
+      assetRef: `kenney:car:${index === 0 ? "sedan" : index === 1 ? "suv" : "van"}`,
+    });
+  });
   building(
     170,
     325,
@@ -492,6 +558,46 @@ export function zarajNzProject() {
     2,
     0,
     "Commercial",
+  );
+  // Surveyed connection targets from current OpenStreetMap data around Rolleston.
+  add(
+    "road",
+    [
+      [0, -355],
+      [20, -430],
+      [123, -714],
+    ],
+    "Main Entry · Selwyn Road connection",
+    {
+      width: 24,
+      lanes: 4,
+      color: "#374151",
+      assetRef: "builtin:road:external-access",
+    },
+  );
+  add(
+    "road",
+    [
+      [485, -190],
+      [515, -310],
+      [549, -457],
+    ],
+    "Secondary Exit · Selwyn and Waterholes junction",
+    {
+      width: 14,
+      lanes: 2,
+      color: "#46515b",
+      assetRef: "builtin:road:external-access",
+    },
+  );
+  building(
+    488,
+    -188,
+    "East security gate",
+    20,
+    9,
+    "builtin:society:gate",
+    "#d7c09d",
   );
   for (let i = 0; i < 40; i++) {
     const x = -470 + i * 24;

@@ -38,6 +38,25 @@ describe("metric geometry and project commands", () => {
         (object) => object.assetRef === "builtin:society:graveyard",
       ),
     ).toBe(true);
+    for (const faithAsset of ["church", "temple", "gurdwara"])
+      expect(
+        project.objects.some(
+          (object) =>
+            object.assetRef === `builtin:society:${faithAsset}` &&
+            object.buildingType === "Place of worship",
+        ),
+      ).toBe(true);
+    const accessRoads = project.objects.filter(
+      (object) =>
+        object.kind === "road" &&
+        ["Entry", "Exit", "Link"].some((word) => object.name.includes(word)),
+    );
+    expect(accessRoads).toHaveLength(2);
+    expect(
+      accessRoads.every((road) =>
+        road.points.some(([x, y]) => Math.abs(x) > 500 || Math.abs(y) > 380),
+      ),
+    ).toBe(true);
     const roads = project.objects.filter((object) => object.kind === "road"),
       homes = project.objects.filter(
         (object) =>
@@ -76,6 +95,10 @@ describe("metric geometry and project commands", () => {
           )
             overlaps.push(`${home.name} overlaps ${road.name}`);
     expect(overlaps).toEqual([]);
+    expect(project.origin).toEqual([172.439, -43.6005]);
+    expect(
+      project.objects.some((object) => object.name.includes("Canal")),
+    ).toBe(false);
   });
   it("resizes a building from one corner while keeping the opposite corner fixed", () => {
     const p = newProject(),

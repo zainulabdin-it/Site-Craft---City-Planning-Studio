@@ -144,10 +144,9 @@ export function resizeFromHandle(
     ];
   return {
     ...o,
-    points: [[
-      (opposite[0] + adjusted[0]) / 2,
-      (opposite[1] + adjusted[1]) / 2,
-    ]],
+    points: [
+      [(opposite[0] + adjusted[0]) / 2, (opposite[1] + adjusted[1]) / 2],
+    ],
     width,
     depth,
   };
@@ -210,6 +209,21 @@ export function validateProject(input: unknown): Project {
     } else if (!["boundary", "plot"].includes(o.kind) && o.points.length !== 1)
       throw Error("Object needs one anchor.");
     if (o.kind !== "boundary" && bounds.length) {
+      const externalAccess =
+        o.kind === "road" && o.assetRef === "builtin:road:external-access";
+      if (externalAccess) {
+        const hasInsidePoint = o.points.some((point) =>
+            inside(point, bounds[0].points),
+          ),
+          hasOutsidePoint = o.points.some(
+            (point) => !inside(point, bounds[0].points),
+          );
+        if (!hasInsidePoint || !hasOutsidePoint)
+          throw Error(
+            `${o.name} must connect one point inside the site to one point outside.`,
+          );
+        continue;
+      }
       const shape = ["building", "bridge"].includes(o.kind)
         ? footprint(o)
         : o.points;
