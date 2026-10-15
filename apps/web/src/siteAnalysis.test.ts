@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyzeSite } from "./siteAnalysis";
+import { toGeo } from "./geometry";
 
 const boundary: [number, number][] = [
   [-50, -50],
@@ -21,6 +22,12 @@ describe("site analysis", () => {
   });
 
   it("reports mapped access, buildings, water and land use", async () => {
+    const origin: [number, number] = [172.6362, -43.5321],
+      geometry = (points: [number, number][]) =>
+        points.map((point) => {
+          const [lon, lat] = toGeo(point, origin);
+          return { lon, lat };
+        });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -30,21 +37,54 @@ describe("site analysis", () => {
             {
               type: "way",
               tags: { highway: "residential", name: "Boundary Road" },
-              center: { lon: 172.6362, lat: -43.53165 },
+              geometry: geometry([
+                [-100, 0],
+                [100, 0],
+              ]),
             },
-            { type: "way", tags: { building: "house" } },
-            { type: "way", tags: { waterway: "stream" } },
-            { type: "way", tags: { landuse: "residential" } },
+            {
+              type: "way",
+              tags: { building: "house" },
+              geometry: geometry([
+                [-10, -10],
+                [10, -10],
+                [10, 10],
+                [-10, 10],
+              ]),
+            },
+            {
+              type: "way",
+              tags: { waterway: "stream" },
+              geometry: geometry([
+                [-80, 20],
+                [80, 20],
+              ]),
+            },
+            {
+              type: "way",
+              tags: { landuse: "residential" },
+              geometry: geometry([
+                [-60, -60],
+                [60, -60],
+                [60, 60],
+                [-60, 60],
+              ]),
+            },
           ],
         }),
       }),
     );
-    const result = await analyzeSite(boundary, [172.6362, -43.5321]);
+    const result = await analyzeSite(boundary, origin);
     expect(result.sourceAvailable).toBe(true);
     expect(result.nearbyRoads).toBe(1);
     expect(result.accessRoads).toContain("Boundary Road");
     expect(result.existingBuildings).toBe(1);
     expect(result.waterFeatures).toBe(1);
     expect(result.landUse).toContain("residential");
+    expect(result.intersectingRoads).toBe(1);
+    expect(result.intersectingBuildings).toBe(1);
+    expect(result.intersectingWaterFeatures).toBe(1);
+    expect(result.intersectingLandUse).toContain("residential");
+    expect(result.buildability).toBe("blocked");
   });
 });

@@ -3054,6 +3054,25 @@ export default function App() {
               </div>
             ) : (
               <>
+                <div
+                  className={`buildability-status ${siteAnalysis.result.buildability}`}
+                >
+                  <div>
+                    <small>BUILDABILITY SCREEN</small>
+                    <b>
+                      {siteAnalysis.result.buildability === "blocked"
+                        ? "Mapped constraint intersects this site"
+                        : siteAnalysis.result.buildability === "review"
+                          ? "No mapped water overlap · professional review required"
+                          : "Data incomplete · suitability unknown"}
+                    </b>
+                  </div>
+                  <span>
+                    {siteAnalysis.result.sourceAvailable
+                      ? "OSM context checked"
+                      : "Live source unavailable"}
+                  </span>
+                </div>
                 <div className="analysis-metrics">
                   <article>
                     <small>AREA</small>
@@ -3102,8 +3121,19 @@ export default function App() {
                       {siteAnalysis.result.existingBuildings} mapped buildings ·{" "}
                       {siteAnalysis.result.waterFeatures} water features
                     </p>
+                    <p className="intersection-summary">
+                      <b>{siteAnalysis.result.intersectingBuildings}</b>{" "}
+                      buildings ·{" "}
+                      <b>{siteAnalysis.result.intersectingWaterFeatures}</b>{" "}
+                      water features ·{" "}
+                      <b>{siteAnalysis.result.intersectingRoads}</b> roads
+                      intersect site
+                    </p>
                     <div className="analysis-tags">
-                      {siteAnalysis.result.landUse.map((item) => (
+                      {(siteAnalysis.result.intersectingLandUse.length
+                        ? siteAnalysis.result.intersectingLandUse
+                        : siteAnalysis.result.landUse
+                      ).map((item) => (
                         <span key={item}>{item.replaceAll("_", " ")}</span>
                       ))}
                       {!siteAnalysis.result.landUse.length && (
@@ -3122,7 +3152,7 @@ export default function App() {
                 </div>
                 <small className="analysis-source">
                   {siteAnalysis.result.sourceAvailable
-                    ? "Map context: © OpenStreetMap contributors. Concept check only."
+                    ? `Map context: © OpenStreetMap contributors · checked ${new Date(siteAnalysis.result.checkedAt).toLocaleString()}. Concept check only.`
                     : "Local boundary measurements only."}
                 </small>
               </>
