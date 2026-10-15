@@ -7,7 +7,15 @@ import {
   type Kind,
   type DesignObject,
 } from "./model";
-import { toGeo, toLocal, footprint, area, length, inside } from "./geometry";
+import {
+  toGeo,
+  toLocal,
+  footprint,
+  area,
+  length,
+  inside,
+  distance,
+} from "./geometry";
 import { getCustomAssetUrlSync, hydrateCustomAssetUrls } from "./assetStorage";
 export type ViewAction = {
   type:
@@ -43,6 +51,9 @@ interface Props {
   objectOpacity?: Record<string, number>;
   selected: string;
   draft: Point[];
+  draftPointer: Point | null;
+  drawingKind: string;
+  onPointer: (p: Point | null) => void;
   onClick: (p: Point, id?: string) => void;
   onMove: (id: string, p: Point) => void;
   onResize: (id: string, handle: number, p: Point) => void;
@@ -56,6 +67,7 @@ interface Props {
 export function Viewport(props: Props) {
   const [assetVersion, setAssetVersion] = useState(0);
   const [terrainVersion, setTerrainVersion] = useState(0);
+  const [viewLoading, setViewLoading] = useState(true);
   const container = useRef<HTMLDivElement>(null),
     viewer = useRef<C.Viewer | null>(null),
     latest = useRef(props),
@@ -63,7 +75,8 @@ export function Viewport(props: Props) {
     opacityCache = useRef(new Map<string, number>()),
     modeCache = useRef(""),
     terrainActive = useRef(false),
-    hasInitialFrame = useRef(false);
+    hasInitialFrame = useRef(false),
+    renderingStartedAt = useRef(Date.now());
   latest.current = props;
   useEffect(() => {
     let active = true;
@@ -262,6 +275,18 @@ export function Viewport(props: Props) {
       );
     }
     v.scene.requestRender();
+    const stopLoading = () => {
+      if (
+        Date.now() - renderingStartedAt.current >= 220 &&
+        v.scene.globe.tilesLoaded
+      )
+        setViewLoading(false);
+    };
+    const removePostRender = v.scene.postRender.addEventListener(stopLoading);
+    const loadingFallback = window.setTimeout(
+      () => setViewLoading(false),
+      4000,
+    );
     const initialFrameTimer = window.setTimeout(() => {
       if (v.isDestroyed()) return;
       v.camera.flyToBoundingSphere(
@@ -356,6 +381,19 @@ export function Viewport(props: Props) {
         drag.end = C.Cartesian2.clone(e.endPosition);
         return;
       }
+      if (
+        [
+          "boundary",
+          "road",
+          "plot",
+          "freehand",
+          "rectangle",
+          "circle",
+        ].includes(latest.current.drawingKind)
+      ) {
+        const pointer = groundAt(e.endPosition);
+        latest.current.onPointer(pointer || null);
+      }
       const id = objectAt(e.endPosition);
       if (id === hovered) return;
       hovered = id || "";
@@ -419,6 +457,8 @@ export function Viewport(props: Props) {
       C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK,
     );
     return () => {
+      removePostRender();
+      window.clearTimeout(loadingFallback);
       window.clearTimeout(initialFrameTimer);
       v.scene.screenSpaceCameraController.enableInputs = true;
       h.destroy();
@@ -432,6 +472,8 @@ export function Viewport(props: Props) {
     const v = viewer.current;
     if (!v) return;
     const presentation = props.viewMode !== "2d";
+    renderingStartedAt.current = Date.now();
+    setViewLoading(true);
     v.scene.highDynamicRange = presentation;
     v.scene.fog.enabled = presentation;
     v.scene.light = new C.SunLight({ intensity: presentation ? 2.15 : 1.25 });
@@ -442,6 +484,8 @@ export function Viewport(props: Props) {
     if (v.scene.skyAtmosphere)
       v.scene.skyAtmosphere.brightnessShift = presentation ? 0.12 : 0;
     v.scene.requestRender();
+    const fallback = window.setTimeout(() => setViewLoading(false), 4000);
+    return () => window.clearTimeout(fallback);
   }, [props.viewMode]);
   useEffect(() => {
     const v = viewer.current;
@@ -1321,7 +1365,9 @@ export function Viewport(props: Props) {
                     ? C.Color.WHITE
                     : C.Color.fromCssColorString(
                         variant === "small"
-                          ? foliagePalette[(treeHash + 1) % foliagePalette.length]
+                          ? foliagePalette[
+                              (treeHash + 1) % foliagePalette.length
+                            ]
                           : foliage,
                       ),
                   proofTree ? 0 : 0.22,
@@ -1778,16 +1824,73 @@ export function Viewport(props: Props) {
         }),
       );
     }
-    v.entities.removeById("_draft");
-    if (props.draft.length > 1)
+    for (const entity of [...v.entities.values])
+      if (typeof entity.id === "string" && entity.id.startsWith("_draft"))
+        v.entities.remove(entity);
+    const previewPoints =
+      props.draftPointer && props.draft.length
+        ? [...props.draft, props.draftPointer]
+        : props.draft;
+    if (previewPoints.length > 1)
       v.entities.add({
-        id: "_draft",
+        id: "_draft:line",
         polyline: {
-          positions: props.draft.map((q) => position(q, 0.5)),
+          positions: previewPoints.map((q) => position(q, 0.5)),
           width: 3,
-          material: C.Color.YELLOW,
+          material: C.Color.fromCssColorString("#2563eb"),
         },
       });
+    if (props.drawingKind !== "road" && previewPoints.length > 2)
+      v.entities.add({
+        id: "_draft:closing-edge",
+        polyline: {
+          positions: [previewPoints.at(-1)!, previewPoints[0]].map((q) =>
+            position(q, 0.48),
+          ),
+          width: 2,
+          material: new C.PolylineDashMaterialProperty({
+            color: C.Color.fromCssColorString("#60a5fa"),
+            dashLength: 12,
+          }),
+        },
+      });
+    props.draft.forEach((point, index) =>
+      v.entities.add({
+        id: `_draft:vertex:${index}`,
+        position: position(point, 0.8),
+        point: {
+          pixelSize: index === 0 ? 14 : 12,
+          color: C.Color.WHITE,
+          outlineColor: C.Color.fromCssColorString("#2563eb"),
+          outlineWidth: 4,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      }),
+    );
+    if (props.draftPointer && props.draft.length) {
+      const segment = distance(props.draft.at(-1)!, props.draftPointer);
+      v.entities.add({
+        id: "_draft:pointer",
+        position: position(props.draftPointer, 1),
+        point: {
+          pixelSize: 11,
+          color: C.Color.fromCssColorString("#2563eb"),
+          outlineColor: C.Color.WHITE,
+          outlineWidth: 3,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: `${segment.toFixed(1)} m`,
+          font: "600 13px Inter, Segoe UI, sans-serif",
+          fillColor: C.Color.WHITE,
+          showBackground: true,
+          backgroundColor: C.Color.fromCssColorString("#0f172a").withAlpha(0.9),
+          backgroundPadding: new C.Cartesian2(8, 5),
+          pixelOffset: new C.Cartesian2(0, -23),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    }
     v.scene.requestRender();
   }, [
     props.project,
@@ -1795,6 +1898,8 @@ export function Viewport(props: Props) {
     props.opacity,
     props.selected,
     props.draft,
+    props.draftPointer,
+    props.drawingKind,
     props.navigationMode,
     assetVersion,
     terrainVersion,
@@ -2053,13 +2158,42 @@ export function Viewport(props: Props) {
     if (props.action.type === "location" && props.action.location) {
       const { center, bounds } = props.action.location,
         width = Math.max(bounds[2] - bounds[0], 0.01),
-        height = Math.max(bounds[3] - bounds[1], 0.01),
-        rectangle = C.Rectangle.fromDegrees(
-          center[0] - width / 2,
-          center[1] - height / 2,
-          center[0] + width / 2,
-          center[1] + height / 2,
-        );
+        height = Math.max(bounds[3] - bounds[1], 0.01);
+      if (props.viewMode === "street") {
+        v.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(center[0], center[1], 18),
+          orientation: {
+            heading: v.camera.heading,
+            pitch: -0.18,
+            roll: 0,
+          },
+          duration: 1.1,
+        });
+        return;
+      }
+      if (props.viewMode === "3d") {
+        const spanMetres = Math.max(width, height) * 111_320;
+        v.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(
+            center[0],
+            center[1],
+            Math.max(900, spanMetres * 1.35),
+          ),
+          orientation: {
+            heading: v.camera.heading,
+            pitch: -0.62,
+            roll: 0,
+          },
+          duration: 1.1,
+        });
+        return;
+      }
+      const rectangle = C.Rectangle.fromDegrees(
+        center[0] - width / 2,
+        center[1] - height / 2,
+        center[0] + width / 2,
+        center[1] + height / 2,
+      );
       v.camera.flyTo({ destination: rectangle, duration: 1.1 });
       return;
     }
@@ -2177,6 +2311,20 @@ export function Viewport(props: Props) {
       ...points.map((q) => Math.hypot(q[0] - center[0], q[1] - center[1])),
     );
     const ll = toGeo(center, props.project.origin);
+    if (props.action.type === "frame" && props.viewMode === "street") {
+      v.camera.flyTo({
+        destination: C.Cartesian3.fromDegrees(...ll, 8),
+        orientation: {
+          heading: v.camera.heading,
+          pitch: -0.18,
+          roll: 0,
+        },
+        duration: 0.6,
+      });
+      return;
+    }
+    const preservePerspective =
+      props.action.type === "frame" && props.viewMode === "3d";
     v.camera.flyToBoundingSphere(
       new C.BoundingSphere(C.Cartesian3.fromDegrees(...ll), radius),
       {
@@ -2184,18 +2332,18 @@ export function Viewport(props: Props) {
         offset: new C.HeadingPitchRange(
           props.action.type === "drone"
             ? -0.78
-            : props.action.type === "perspective"
+            : props.action.type === "perspective" || preservePerspective
               ? -0.58
               : 0,
           props.action.type === "drone"
             ? -0.68
-            : props.action.type === "perspective"
+            : props.action.type === "perspective" || preservePerspective
               ? -0.52
               : -Math.PI / 2,
           radius *
             (props.action.type === "drone"
               ? 1.35
-              : props.action.type === "perspective"
+              : props.action.type === "perspective" || preservePerspective
                 ? 1.85
                 : 3),
         ),
@@ -2203,10 +2351,30 @@ export function Viewport(props: Props) {
     );
   }, [props.action, props.navigationProfile]);
   return (
-    <div
-      className={`viewport${props.navigationMode ? " navigate" : ""}`}
-      ref={container}
-      aria-label="3D planning viewport"
-    />
+    <div className="viewport-shell">
+      <div
+        className={`viewport${props.navigationMode ? " navigate" : ""}`}
+        ref={container}
+        aria-label="3D planning viewport"
+      />
+      {viewLoading && (
+        <div className="view-loader" role="status" aria-live="polite">
+          <div className="view-loader-logo">S</div>
+          <b>sitecraft</b>
+          <span>
+            Preparing{" "}
+            {props.viewMode === "2d"
+              ? "2D map"
+              : props.viewMode === "3d"
+                ? "3D view"
+                : "street view"}
+            …
+          </span>
+          <div className="view-loader-progress">
+            <i />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

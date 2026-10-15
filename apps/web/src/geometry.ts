@@ -227,6 +227,14 @@ export function validateProject(input: unknown): Project {
       const shape = ["building", "bridge"].includes(o.kind)
         ? footprint(o)
         : o.points;
+      const requiredArea = shape.length >= 3 ? area(shape) : 0;
+      const largestBoundaryArea = Math.max(
+        ...bounds.map((boundary) => area(boundary.points)),
+      );
+      if (requiredArea > largestBoundaryArea + 0.0001)
+        throw Error(
+          `${o.name} needs ${requiredArea.toFixed(1)} m² (${(requiredArea / 25.2929).toFixed(2)} marla), but the largest site is only ${largestBoundaryArea.toFixed(1)} m² (${(largestBoundaryArea / 25.2929).toFixed(2)} marla).`,
+        );
       const containingBoundary = bounds.find((boundary) =>
         shape.every((vertex) => inside(vertex, boundary.points)),
       );

@@ -997,6 +997,67 @@ main {
   position: absolute;
   inset: 0;
 }
+.viewport-shell {
+  position: absolute;
+  inset: 0;
+}
+.view-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(248, 250, 252, 0.94);
+  color: #0f172a;
+  backdrop-filter: blur(5px);
+}
+.view-loader-logo {
+  width: 48px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px 4px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 800;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.24);
+}
+.view-loader b {
+  color: #1d4ed8;
+  font-size: 22px;
+}
+.view-loader span {
+  color: #64748b;
+  font-size: 13px;
+}
+.view-loader-progress {
+  width: 170px;
+  height: 4px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbeafe;
+}
+.view-loader-progress i {
+  display: block;
+  width: 45%;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  animation: view-loader-slide 1s ease-in-out infinite;
+}
+@keyframes view-loader-slide {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(245%);
+  }
+}
 .viewport.navigate canvas {
   cursor: grab;
 }
@@ -1724,6 +1785,44 @@ main {
 .drawing-hint b {
   width: 100%;
   text-align: center;
+}
+.capacity-check {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+.capacity-check div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.capacity-check small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.capacity-check b {
+  color: #1e3a8a;
+  font-size: 13px;
+}
+.capacity-check span {
+  color: #166534;
+  font-size: 12px;
+  font-weight: 600;
+}
+.capacity-check.too-large {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.capacity-check.too-large span {
+  color: #b91c1c;
 }
 .map-bottom {
   position: absolute;

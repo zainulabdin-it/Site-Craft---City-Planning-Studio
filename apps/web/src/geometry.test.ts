@@ -281,6 +281,22 @@ describe("metric geometry and project commands", () => {
       validateProject({ ...p, objects: [...p.objects, outside] }),
     ).toThrow("must remain inside one site boundary");
   });
+  it("rejects an object whose required area is larger than the site", () => {
+    const p = newProject("Five marla site"),
+      boundary = newObject(p, "boundary", [
+        [-5, -5],
+        [5, -5],
+        [5, 5],
+        [-5, 5],
+      ]),
+      house = newObject(p, "building", [[0, 0]]);
+    house.width = 12;
+    house.depth = 16;
+    p.objects = [boundary, house];
+    expect(() => validateProject(p)).toThrow(
+      /needs 192\.0 m² .*largest site is only 100\.0 m²/,
+    );
+  });
   it("validates dimensions, scene persistence, and parametric footprint changes", () => {
     const p = demoProject();
     expect(validateProject(JSON.parse(JSON.stringify(p)))).toEqual(p);

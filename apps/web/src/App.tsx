@@ -55,6 +55,7 @@ import {
   length,
   area,
   distance,
+  footprint,
   moveTo,
   resizeFromHandle,
 } from "./geometry";
@@ -209,6 +210,7 @@ export default function App() {
       Kind | "select" | "move" | "hand" | "rectangle" | "circle" | "freehand"
     >("select"),
     [draft, setDraft] = useState<Point[]>([]),
+    [draftPointer, setDraftPointer] = useState<Point | null>(null),
     [visible, setVisible] = useState(
       Object.fromEntries(
         boot.project.designLayers.map((layer) => [layer.kind, layer.visible]),
@@ -370,6 +372,7 @@ export default function App() {
   };
   const cancel = () => {
     setDraft([]);
+    setDraftPointer(null);
     setTool("select");
     setPlacementAsset(null);
   };
@@ -477,6 +480,7 @@ export default function App() {
       o.name = `Site ${siteNumber} boundary`;
     }
     setPlacementDialog({ object: o, command: `Draw ${tool}` });
+    setDraftPointer(null);
   };
   const click = (p: Point, id?: string) => {
     if (tool === "hand") return;
@@ -577,6 +581,7 @@ export default function App() {
     if (["boundary", "road", "plot", "freehand"].includes(tool)) {
       if (draft.length && distance(draft.at(-1)!, p) < 0.1) return;
       setDraft([...draft, p]);
+      setDraftPointer(p);
       return;
     }
     const o = newObject(project, tool as Kind, [p]);
@@ -799,17 +804,15 @@ export default function App() {
   const jumpToLocation = (value: string) => {
     if (!value) return;
     if (value === "project") {
-      frame(undefined, "top");
+      frame();
       return;
     }
     if (value.startsWith("site:")) {
-      frame(value.slice(5), "top");
+      frame(value.slice(5));
       return;
     }
     if (value.startsWith("place:")) {
-      const id = value.slice(6),
-        object = project.objects.find((item) => item.id === id);
-      frame(id, object?.kind === "building" ? "perspective" : "top");
+      frame(value.slice(6));
       return;
     }
     const location = quickLocations.find((item) => item.id === value);
@@ -1857,6 +1860,9 @@ export default function App() {
             visible={visible}
             opacity={opacity}
             draft={draft}
+            draftPointer={draftPointer}
+            drawingKind={tool}
+            onPointer={setDraftPointer}
             onClick={click}
             onMove={moveObject}
             onResize={resizeObject}
@@ -2254,8 +2260,19 @@ export default function App() {
                   <span>
                     {draft.length} points ·{" "}
                     {tool === "road"
-                      ? `${length(draft).toFixed(1)} m`
-                      : `${area(draft).toFixed(0)} m²`}
+                      ? `${length(draftPointer && draft.length ? [...draft, draftPointer] : draft).toFixed(1)} m`
+                      : (() => {
+                          const preview =
+                            draftPointer && draft.length
+                              ? [...draft, draftPointer]
+                              : draft;
+                          const squareMetres = area(preview);
+                          const segment =
+                            draftPointer && draft.length
+                              ? distance(draft.at(-1)!, draftPointer)
+                              : 0;
+                          return `${segment.toFixed(1)} m current edge · ${squareMetres.toFixed(1)} m² · ${(squareMetres / 25.2929).toFixed(2)} marla`;
+                        })()}
                   </span>
                   <button
                     className="primary"
@@ -2943,6 +2960,45 @@ export default function App() {
                 />
               </label>
             </div>
+            {(() => {
+              const object = placementDialog.object;
+              const required =
+                object.kind === "boundary" || object.kind === "plot"
+                  ? area(object.points)
+                  : ["building", "bridge"].includes(object.kind)
+                    ? area(footprint(object))
+                    : 0;
+              const siteAreas = project.objects
+                .filter((item) => item.kind === "boundary")
+                .map((item) => area(item.points));
+              const capacity = siteAreas.length
+                ? Math.max(...siteAreas)
+                : required;
+              if (!required) return null;
+              const fits = object.kind === "boundary" || required <= capacity;
+              return (
+                <div
+                  className={`capacity-check ${fits ? "fits" : "too-large"}`}
+                >
+                  <div>
+                    <small>
+                      {object.kind === "boundary" ? "SITE SIZE" : "SIZE CHECK"}
+                    </small>
+                    <b>
+                      {required.toFixed(1)} m² ·{" "}
+                      {(required / 25.2929).toFixed(2)} marla
+                    </b>
+                  </div>
+                  {object.kind !== "boundary" && (
+                    <span>
+                      {fits
+                        ? `Fits area capacity · site ${capacity.toFixed(1)} m²`
+                        : `Too large · site capacity ${capacity.toFixed(1)} m²`}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             <div className="modal-actions">
               <button
                 onClick={() => {
