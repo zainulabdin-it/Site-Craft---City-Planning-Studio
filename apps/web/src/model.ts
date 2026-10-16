@@ -68,6 +68,12 @@ export const dataLayerSchema = z.object({
   opacity: z.number().min(0).max(1),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   source: z.string().max(200),
+  hazardType: z
+    .enum(["flood", "liquefaction", "coastal", "fault", "contamination"])
+    .optional(),
+  hazardSeverity: z.enum(["information", "review", "avoid"]).optional(),
+  confidence: z.enum(["authoritative", "indicative", "unknown"]).optional(),
+  sourceDate: z.string().max(40).optional(),
   features: z.array(dataFeatureSchema).max(50000),
 });
 export type DataLayer = z.infer<typeof dataLayerSchema>;
@@ -131,13 +137,105 @@ export const projectV2Schema = z
     designLayers: z.array(designLayerSchema).length(8),
   })
   .strict();
-export const projectSchema = z
+export const projectV3Schema = z
   .object({
     schemaVersion: z.literal(3),
     ...projectFields,
     dataLayers: z.array(dataLayerSchema).max(100),
     designLayers: z.array(designLayerSchema).length(8),
     projectLayers: z.array(projectLayerSchema).max(20),
+  })
+  .strict();
+export const planningSettingsSchema = z.object({
+  unitSystem: z.enum(["metric", "imperial"]),
+  residentsPerUnit: z.number().min(1).max(10),
+  parkingSpacesPerUnit: z.number().min(0).max(5),
+  maximumSiteCoveragePercent: z.number().min(1).max(100),
+  minimumGreenSpacePercent: z.number().min(0).max(100),
+  maximumRoadAccessDistanceM: z.number().min(1).max(500),
+});
+export const dataSourceSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  kind: z.enum(["basemap", "terrain", "context", "hazard", "rules"]),
+  url: z.string().max(500),
+  license: z.string().max(200),
+  fetchedAt: z.string(),
+  resolution: z.string().max(100),
+  confidence: z.enum(["authoritative", "indicative", "unknown"]),
+});
+export const zoneSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  type: z.enum([
+    "residential",
+    "commercial",
+    "mixed-use",
+    "education",
+    "health",
+    "faith",
+    "recreation",
+    "cemetery",
+    "utility",
+    "protected",
+  ]),
+  parcelIds: z.array(z.string().uuid()).max(2000),
+  allowedBuildingTypes: z
+    .array(
+      z.enum([
+        "Detached house",
+        "Townhouse",
+        "Apartment",
+        "Commercial",
+        "Place of worship",
+        "School",
+        "Clinic",
+        "Community",
+      ]),
+    )
+    .max(8),
+  frontSetbackM: z.number().min(0).max(100),
+  sideSetbackM: z.number().min(0).max(100),
+  rearSetbackM: z.number().min(0).max(100),
+  maximumFloors: z.number().int().min(1).max(60),
+  maximumCoveragePercent: z.number().min(1).max(100),
+  maximumFar: z.number().min(0.1).max(20),
+  minimumPlotAreaM2: z.number().min(1).max(1_000_000),
+});
+export type Zone = z.infer<typeof zoneSchema>;
+export const scenarioSnapshotSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  createdAt: z.string(),
+  objects: z.array(objectSchema).max(2000),
+});
+export type ScenarioSnapshot = z.infer<typeof scenarioSnapshotSchema>;
+export const utilityNetworkSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  type: z.enum(["water", "wastewater", "stormwater", "electricity", "telecom"]),
+  sourceRoadId: z.string().uuid().optional(),
+  points: z.array(pointSchema).min(2).max(500),
+  capacity: z.number().min(0).max(1_000_000),
+  capacityUnit: z.string().min(1).max(30),
+  connectionDistanceM: z.number().min(1).max(500),
+  connectedObjectIds: z.array(z.string().uuid()).max(2000),
+  source: z.string().max(200),
+  confidence: z.enum(["authoritative", "indicative", "unknown"]),
+});
+export type UtilityNetwork = z.infer<typeof utilityNetworkSchema>;
+export const projectSchema = z
+  .object({
+    schemaVersion: z.literal(4),
+    ...projectFields,
+    dataLayers: z.array(dataLayerSchema).max(100),
+    designLayers: z.array(designLayerSchema).length(8),
+    projectLayers: z.array(projectLayerSchema).max(20),
+    planningSettings: planningSettingsSchema,
+    dataSources: z.array(dataSourceSchema).max(100),
+    zones: z.array(zoneSchema).max(500),
+    alternatives: z.array(scenarioSnapshotSchema).max(10),
+    utilityNetworks: z.array(utilityNetworkSchema).max(500),
   })
   .strict();
 export type Project = z.infer<typeof projectSchema>;
@@ -154,7 +252,7 @@ export const kinds: Kind[] = [
 ];
 export function newProject(name = "Untitled Christchurch site"): Project {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: crypto.randomUUID(),
     name,
     revision: 0,
@@ -167,6 +265,18 @@ export function newProject(name = "Untitled Christchurch site"): Project {
     dataLayers: [],
     designLayers: kinds.map((kind) => ({ kind, visible: true, opacity: 1 })),
     projectLayers: [],
+    planningSettings: {
+      unitSystem: "metric",
+      residentsPerUnit: 4,
+      parkingSpacesPerUnit: 1.5,
+      maximumSiteCoveragePercent: 45,
+      minimumGreenSpacePercent: 15,
+      maximumRoadAccessDistanceM: 20,
+    },
+    dataSources: [],
+    zones: [],
+    alternatives: [],
+    utilityNetworks: [],
   };
 }
 export function newObject(

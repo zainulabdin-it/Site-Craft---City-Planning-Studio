@@ -8,8 +8,10 @@ import {
   type Project,
   type DesignObject,
   projectSchema,
+  projectV3Schema,
   projectV2Schema,
   legacyProjectSchema,
+  newProject,
 } from "./model";
 proj4.defs(
   "EPSG:2193",
@@ -35,6 +37,11 @@ export const area = (p: Point[]) =>
       return s + a[0] * b[1] - b[0] * a[1];
     }, 0) / 2,
   );
+/** NZ planning display: square metres for sites, hectares for larger land areas. */
+export const formatAreaNZ = (squareMetres: number) =>
+  squareMetres >= 10_000
+    ? `${(squareMetres / 10_000).toFixed(2)} ha`
+    : `${squareMetres.toFixed(squareMetres < 100 ? 1 : 0)} m²`;
 export function moveTo(o: DesignObject, anchor: Point): DesignObject {
   const [x, y] = o.points[0],
     delta: Point = [anchor[0] - x, anchor[1] - y];
@@ -157,7 +164,7 @@ export function validateProject(input: unknown): Project {
     version === 1
       ? {
           ...legacyProjectSchema.parse(input),
-          schemaVersion: 3 as const,
+          schemaVersion: 4 as const,
           dataLayers: [],
           designLayers: [
             "boundary",
@@ -170,14 +177,34 @@ export function validateProject(input: unknown): Project {
             "bridge",
           ].map((kind) => ({ kind, visible: true, opacity: 1 })),
           projectLayers: [],
+          planningSettings: newProject().planningSettings,
+          dataSources: [],
+          zones: [],
+          alternatives: [],
+          utilityNetworks: [],
         }
       : version === 2
         ? {
             ...projectV2Schema.parse(input),
-            schemaVersion: 3 as const,
+            schemaVersion: 4 as const,
             projectLayers: [],
+            planningSettings: newProject().planningSettings,
+            dataSources: [],
+            zones: [],
+            alternatives: [],
+            utilityNetworks: [],
           }
-        : input;
+        : version === 3
+          ? {
+              ...projectV3Schema.parse(input),
+              schemaVersion: 4 as const,
+              planningSettings: newProject().planningSettings,
+              dataSources: [],
+              zones: [],
+              alternatives: [],
+              utilityNetworks: [],
+            }
+          : input;
   const p = projectSchema.parse(migrated);
   const ids = new Set<string>(),
     nodes = new Map<string, string>();
@@ -233,7 +260,7 @@ export function validateProject(input: unknown): Project {
       );
       if (requiredArea > largestBoundaryArea + 0.0001)
         throw Error(
-          `${o.name} needs ${requiredArea.toFixed(1)} m² (${(requiredArea / 25.2929).toFixed(2)} marla), but the largest site is only ${largestBoundaryArea.toFixed(1)} m² (${(largestBoundaryArea / 25.2929).toFixed(2)} marla).`,
+          `${o.name} needs ${formatAreaNZ(requiredArea)}, but the largest site is only ${formatAreaNZ(largestBoundaryArea)}.`,
         );
       const containingBoundary = bounds.find((boundary) =>
         shape.every((vertex) => inside(vertex, boundary.points)),
@@ -258,6 +285,69 @@ export function validateProject(input: unknown): Project {
     }
   }
   return p;
+}
+
+export function validateObjectCollisions(p: Project, changedIds: Set<string>) {
+  const minimumMeaningfulOverlapM2 = 0.1;
+  const buildings = p.objects.filter((object) => object.kind === "building");
+  const overlapArea = (left: MultiPolygon, right: MultiPolygon) =>
+    polygonClipping
+      .intersection(left, right)
+      .reduce(
+        (sum, polygon) =>
+          sum +
+          polygon.reduce(
+            (polygonArea, ring, index) =>
+              polygonArea + (index === 0 ? area(ring) : -area(ring)),
+            0,
+          ),
+        0,
+      );
+  for (let i = 0; i < buildings.length; i++)
+    for (let j = i + 1; j < buildings.length; j++) {
+      if (!changedIds.has(buildings[i].id) && !changedIds.has(buildings[j].id))
+        continue;
+      const overlap = overlapArea(
+        [[footprint(buildings[i])]],
+        [[footprint(buildings[j])]],
+      );
+      if (overlap > minimumMeaningfulOverlapM2)
+        throw Error(
+          buildings[i].name +
+            " overlaps " +
+            buildings[j].name +
+            " by " +
+            overlap.toFixed(1) +
+            " m². Move or resize one building.",
+        );
+    }
+  const roadObjects = p.objects.filter((object) => object.kind === "road");
+  if (roadObjects.length) {
+    const allRoads = roadSurface(roadObjects),
+      changedRoadObjects = roadObjects.filter((road) =>
+        changedIds.has(road.id),
+      ),
+      changedRoads = changedRoadObjects.length
+        ? roadSurface(changedRoadObjects)
+        : [];
+    for (const building of buildings) {
+      // Security gates are deliberately built above an access carriageway.
+      if (building.assetRef === "builtin:society:gate") continue;
+      const buildingChanged = changedIds.has(building.id);
+      if (!buildingChanged && !changedRoadObjects.length) continue;
+      // A new road should only be checked against its own surface. Otherwise
+      // an unrelated legacy overlap elsewhere in the project blocks the edit.
+      const relevantRoads = buildingChanged ? allRoads : changedRoads;
+      const overlap = overlapArea([[footprint(building)]], relevantRoads);
+      if (overlap > minimumMeaningfulOverlapM2)
+        throw Error(
+          building.name +
+            " overlaps a road by " +
+            (overlap < 1 ? overlap.toFixed(2) : overlap.toFixed(1)) +
+            " m². Move the building behind the road edge.",
+        );
+    }
+  }
 }
 export function projectToSegment(p: Point, a: Point, b: Point) {
   const den = distance(a, b) ** 2;

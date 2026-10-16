@@ -36,13 +36,25 @@ export type ViewAction = {
     | "strafe-left"
     | "strafe-right"
     | "move-up"
-    | "move-down";
+    | "move-down"
+    | "cinematic-entrance"
+    | "cinematic-boulevard"
+    | "cinematic-landmarks"
+    | "cinematic-aerial";
   id?: string;
   location?: {
     center: Point;
     bounds: [number, number, number, number];
   };
   seq: number;
+};
+export type TerrainAnalysis = {
+  available: boolean;
+  minimumM?: number;
+  maximumM?: number;
+  rangeM?: number;
+  maximumSlopePercent?: number;
+  sampledAt?: string;
 };
 interface Props {
   project: Project;
@@ -54,15 +66,24 @@ interface Props {
   draftPointer: Point | null;
   drawingKind: string;
   onPointer: (p: Point | null) => void;
+  onCursor: (p: Point | null) => void;
+  onCameraInfo: (info: {
+    height: number;
+    bearing: number;
+    pitch: number;
+  }) => void;
   onClick: (p: Point, id?: string) => void;
+  onFinishDrawing: (p?: Point) => void;
+  onActivateMove: () => void;
   onMove: (id: string, p: Point) => void;
   onResize: (id: string, handle: number, p: Point) => void;
   onError: (s: string) => void;
   action: ViewAction;
   onContext: (s: string) => void;
+  onTerrainAnalysis: (analysis: TerrainAnalysis) => void;
   navigationMode: boolean;
   navigationProfile: "walk" | "orbit" | "drone";
-  viewMode: "2d" | "3d" | "street";
+  viewMode: "2d" | "3d" | "street" | "cinematic";
 }
 export function Viewport(props: Props) {
   const [assetVersion, setAssetVersion] = useState(0);
@@ -78,6 +99,134 @@ export function Viewport(props: Props) {
     hasInitialFrame = useRef(false),
     renderingStartedAt = useRef(Date.now());
   latest.current = props;
+  useEffect(() => {
+    if (!props.navigationMode || props.viewMode === "2d") return;
+    const held = new Set<string>();
+    const keys = new Set([
+      "KeyW",
+      "KeyA",
+      "KeyS",
+      "KeyD",
+      "KeyQ",
+      "KeyE",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "ShiftLeft",
+      "ShiftRight",
+    ]);
+    let animation = 0;
+    let previous = 0;
+    const stop = () => {
+      held.clear();
+      cancelAnimationFrame(animation);
+      animation = 0;
+      previous = 0;
+    };
+    const blocked = () =>
+      document.activeElement?.matches(
+        "input,textarea,select,[contenteditable=true]",
+      ) ||
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[role="dialog"],.modal-backdrop',
+        ),
+      ).some(
+        (element) =>
+          element.getClientRects().length > 0 &&
+          getComputedStyle(element).visibility !== "hidden",
+      );
+    const tick = (time: number) => {
+      const v = viewer.current;
+      if (!v || v.isDestroyed() || blocked() || !held.size) {
+        stop();
+        return;
+      }
+      const dt = Math.min((time - (previous || time)) / 1000, 0.05);
+      previous = time;
+      const axis = (positive: string, negative: string) =>
+        Number(held.has(positive)) - Number(held.has(negative));
+      const fast = held.has("ShiftLeft") || held.has("ShiftRight");
+      const speed =
+        (props.navigationProfile === "drone" ? 25 : 3) * (fast ? 2.5 : 1);
+      const turn = C.Math.toRadians(65) * dt;
+      const yaw =
+        axis("ArrowRight", "ArrowLeft") +
+        (props.navigationProfile === "drone" ? 0 : axis("KeyE", "KeyQ"));
+      v.camera.lookRight(yaw * turn);
+      const pitch = axis("ArrowUp", "ArrowDown");
+      if (
+        (pitch > 0 && v.camera.pitch < 1.35) ||
+        (pitch < 0 && v.camera.pitch > -1.35)
+      )
+        v.camera.lookUp(pitch * turn);
+      const forward = axis("KeyW", "KeyS");
+      const sideways = axis("KeyD", "KeyA");
+      if (forward || sideways) {
+        const up = v.scene.globe.ellipsoid.geodeticSurfaceNormal(
+          v.camera.positionWC,
+        );
+        const right = C.Cartesian3.normalize(
+          C.Cartesian3.cross(v.camera.directionWC, up, new C.Cartesian3()),
+          new C.Cartesian3(),
+        );
+        const ahead = C.Cartesian3.cross(up, right, new C.Cartesian3());
+        const direction = C.Cartesian3.add(
+          C.Cartesian3.multiplyByScalar(ahead, forward, new C.Cartesian3()),
+          C.Cartesian3.multiplyByScalar(right, sideways, new C.Cartesian3()),
+          new C.Cartesian3(),
+        );
+        const height = v.camera.positionCartographic.height;
+        v.camera.move(C.Cartesian3.normalize(direction, direction), speed * dt);
+        // Walking stays at eye height even while looking up or down.
+        const position = C.Cartographic.clone(v.camera.positionCartographic);
+        position.height = height;
+        v.camera.position = C.Cartographic.toCartesian(
+          position,
+          v.scene.globe.ellipsoid,
+        );
+      }
+      if (props.navigationProfile === "drone")
+        v.camera.moveUp(axis("KeyE", "KeyQ") * speed * dt);
+      v.scene.requestRender();
+      animation = requestAnimationFrame(tick);
+    };
+    const down = (event: KeyboardEvent) => {
+      if (
+        !keys.has(event.code) ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        blocked()
+      )
+        return;
+      event.preventDefault();
+      held.add(event.code);
+      viewer.current?.camera.cancelFlight();
+      if (!animation) animation = requestAnimationFrame(tick);
+    };
+    const up = (event: KeyboardEvent) => {
+      held.delete(event.code);
+      if (!held.size) stop();
+    };
+    const visibility = () => {
+      if (document.hidden) stop();
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", stop);
+    window.addEventListener("pointerdown", stop);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      stop();
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", stop);
+      window.removeEventListener("pointerdown", stop);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [props.navigationMode, props.navigationProfile, props.viewMode]);
   useEffect(() => {
     let active = true;
     const refresh = () =>
@@ -275,7 +424,22 @@ export function Viewport(props: Props) {
       );
     }
     v.scene.requestRender();
+    let lastTelemetry = 0;
+    let lastCameraKey = "";
     const stopLoading = () => {
+      if (Date.now() - lastTelemetry >= 150) {
+        lastTelemetry = Date.now();
+        const info = {
+          height: v.camera.positionCartographic.height,
+          bearing: C.Math.toDegrees(v.camera.heading),
+          pitch: C.Math.toDegrees(v.camera.pitch),
+        };
+        const key = `${info.height.toFixed(1)}:${info.bearing.toFixed(1)}:${info.pitch.toFixed(1)}`;
+        if (key !== lastCameraKey) {
+          lastCameraKey = key;
+          latest.current.onCameraInfo(info);
+        }
+      }
       if (
         Date.now() - renderingStartedAt.current >= 220 &&
         v.scene.globe.tilesLoaded
@@ -329,6 +493,15 @@ export function Viewport(props: Props) {
       const p = groundAt(e.position);
       if (p) latest.current.onClick(p, objectAt(e.position));
     }, C.ScreenSpaceEventType.LEFT_CLICK);
+    h.setInputAction((e: { position: C.Cartesian2 }) => {
+      const p = groundAt(e.position);
+      latest.current.onFinishDrawing(p);
+    }, C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+    h.setInputAction(() => {
+      latest.current.onActivateMove();
+    }, C.ScreenSpaceEventType.RIGHT_CLICK);
+    const preventContextMenu = (event: MouseEvent) => event.preventDefault();
+    v.canvas.addEventListener("contextmenu", preventContextMenu);
     let drag:
       | { kind: "move"; id: string; start: C.Cartesian2; end: C.Cartesian2 }
       | {
@@ -368,7 +541,17 @@ export function Viewport(props: Props) {
       };
       v.scene.screenSpaceCameraController.enableInputs = false;
     }, C.ScreenSpaceEventType.LEFT_DOWN);
+    let lastCursorRead = 0;
+    const clearCursor = () => latest.current.onCursor(null);
+    v.canvas.addEventListener("mouseleave", clearCursor);
     h.setInputAction((e: { endPosition: C.Cartesian2 }) => {
+      if (Date.now() - lastCursorRead >= 80) {
+        lastCursorRead = Date.now();
+        const pointer = groundAt(e.endPosition);
+        latest.current.onCursor(
+          pointer ? toGeo(pointer, latest.current.project.origin) : null,
+        );
+      }
       if (latest.current.navigationMode) {
         if (hovered) {
           hovered = "";
@@ -461,6 +644,8 @@ export function Viewport(props: Props) {
       window.clearTimeout(loadingFallback);
       window.clearTimeout(initialFrameTimer);
       v.scene.screenSpaceCameraController.enableInputs = true;
+      v.canvas.removeEventListener("contextmenu", preventContextMenu);
+      v.canvas.removeEventListener("mouseleave", clearCursor);
       h.destroy();
       v.destroy();
       viewer.current = null;
@@ -471,15 +656,57 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    for (const entity of [...v.entities.values])
+      if (entity.id.startsWith("_utility:")) v.entities.remove(entity);
+    const colours: Record<Project["utilityNetworks"][number]["type"], string> =
+      {
+        water: "#1687ff",
+        wastewater: "#8b5a2b",
+        stormwater: "#22c7d9",
+        electricity: "#f5b800",
+        telecom: "#d946ef",
+      };
+    for (const network of props.project.utilityNetworks) {
+      const colour = C.Color.fromCssColorString(colours[network.type]);
+      v.entities.add({
+        id: `_utility:${network.id}`,
+        name: network.name,
+        polyline: {
+          positions: network.points.map((localPoint) =>
+            C.Cartesian3.fromDegrees(
+              ...toGeo(localPoint, props.project.origin),
+              props.viewMode === "2d" ? 1.1 : 0.7,
+            ),
+          ),
+          width: props.viewMode === "2d" ? 4 : 3,
+          clampToGround: props.viewMode !== "2d",
+          material: new C.PolylineDashMaterialProperty({
+            color: colour.withAlpha(0.9),
+            dashLength: 12,
+          }),
+        },
+      });
+    }
+    v.scene.requestRender();
+  }, [props.project.origin, props.project.utilityNetworks, props.viewMode]);
+  useEffect(() => {
+    const v = viewer.current;
+    if (!v) return;
     const presentation = props.viewMode !== "2d";
     renderingStartedAt.current = Date.now();
     setViewLoading(true);
     v.scene.highDynamicRange = presentation;
     v.scene.fog.enabled = presentation;
     v.scene.light = new C.SunLight({ intensity: presentation ? 2.15 : 1.25 });
-    v.scene.globe.enableLighting = presentation;
-    v.scene.globe.dynamicAtmosphereLighting = presentation;
-    v.scene.globe.dynamicAtmosphereLightingFromSun = presentation;
+    // The editor must present a predictable daylight scene regardless of the
+    // user's local time. Terrain lighting can otherwise turn walkthroughs dark.
+    v.scene.globe.enableLighting = false;
+    v.scene.globe.dynamicAtmosphereLighting = false;
+    v.scene.globe.dynamicAtmosphereLightingFromSun = false;
+    if (v.scene.skyBox) v.scene.skyBox.show = false;
+    v.scene.backgroundColor = C.Color.fromCssColorString(
+      presentation ? "#8fd0ee" : "#b9d8ee",
+    );
     v.scene.postProcessStages.ambientOcclusion.enabled = false;
     if (v.scene.skyAtmosphere)
       v.scene.skyAtmosphere.brightnessShift = presentation ? 0.12 : 0;
@@ -796,9 +1023,17 @@ export function Viewport(props: Props) {
         } else if (o.kind === "building") {
           const customUri = getCustomAssetUrlSync(o.assetRef);
           const isMosque = o.assetRef === "builtin:society:mosque";
-          const facility = o.assetRef.startsWith("builtin:society:")
-            ? o.assetRef.split(":").at(-1) || "facility"
-            : "";
+          const isCinematicHouse = o.assetRef.startsWith(
+            "builtin:cinematic:home-",
+          );
+          const isCinematicTower = o.assetRef.startsWith(
+            "builtin:cinematic:tower-",
+          );
+          const facilityValue = o.assetRef.startsWith("builtin:society:")
+              ? o.assetRef.split(":").at(-1) || "facility"
+              : "",
+            facility =
+              facilityValue === "entrance-gate" ? "gate" : facilityValue;
           const useFacilityGeometry = [
             "gazebo",
             "gate",
@@ -808,6 +1043,7 @@ export function Viewport(props: Props) {
           const useHouseModel =
             !customUri &&
             !isMosque &&
+            !isCinematicHouse &&
             (o.buildingType === "Detached house" ||
               o.buildingType === "Townhouse");
           const houseUris: Record<string, string> = {
@@ -852,6 +1088,172 @@ export function Viewport(props: Props) {
               C.Color.WHITE,
               0,
             );
+          } else if (isCinematicHouse) {
+            const opacity = objectOpacity(o),
+              angle = (o.rotation * Math.PI) / 180,
+              orientation = C.Transforms.headingPitchRollQuaternion(
+                position(o.points[0]),
+                new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
+              ),
+              localPoint = (across: number, forward: number): Point => [
+                o.points[0][0] +
+                  Math.cos(angle) * across -
+                  Math.sin(angle) * forward,
+                o.points[0][1] +
+                  Math.sin(angle) * across +
+                  Math.cos(angle) * forward,
+              ],
+              totalHeight = Math.max(5.8, o.floors * o.floorHeight),
+              isVilla = o.assetRef.endsWith("villa"),
+              isCourtyard = o.assetRef.endsWith("courtyard"),
+              accent = color,
+              warmWhite =
+                C.Color.fromCssColorString("#eee9df").withAlpha(opacity),
+              charcoal =
+                C.Color.fromCssColorString("#34383d").withAlpha(opacity),
+              timber = C.Color.fromCssColorString("#9b643f").withAlpha(opacity),
+              glass = C.Color.fromCssColorString("#6d9fb2").withAlpha(
+                opacity * 0.92,
+              );
+            e.position = position(
+              localPoint(isCourtyard ? -o.width * 0.1 : -o.width * 0.08, 0),
+              o.elevation + totalHeight * 0.5,
+            );
+            e.orientation = orientation;
+            e.box = {
+              dimensions: new C.Cartesian3(
+                o.width * (isVilla ? 0.72 : 0.66),
+                o.depth * 0.86,
+                totalHeight,
+              ),
+              material: warmWhite,
+            };
+            v.entities.add({
+              id: `${o.id}:accent-volume`,
+              position: position(
+                localPoint(o.width * 0.31, isCourtyard ? -0.8 : 0.35),
+                o.elevation + totalHeight * (isVilla ? 0.46 : 0.4),
+              ),
+              orientation,
+              box: {
+                dimensions: new C.Cartesian3(
+                  o.width * 0.3,
+                  o.depth * (isCourtyard ? 0.55 : 0.72),
+                  totalHeight * (isVilla ? 0.92 : 0.78),
+                ),
+                material: accent.withAlpha(opacity),
+              },
+            });
+            v.entities.add({
+              id: `${o.id}:roof`,
+              position: position(
+                localPoint(-o.width * 0.02, 0),
+                o.elevation + totalHeight + 0.22,
+              ),
+              orientation,
+              box: {
+                dimensions: new C.Cartesian3(
+                  o.width * 0.96,
+                  o.depth * 0.96,
+                  0.44,
+                ),
+                material: charcoal,
+              },
+            });
+            const front = o.depth * 0.44 + 0.12;
+            [-0.25, 0.13, 0.36].forEach((ratio, index) =>
+              v.entities.add({
+                id: `${o.id}:glass-${index}`,
+                position: position(
+                  localPoint(o.width * ratio, front),
+                  o.elevation + (index === 1 && o.floors > 1 ? 4.5 : 2.3),
+                ),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(
+                    index === 0 ? o.width * 0.23 : o.width * 0.16,
+                    0.16,
+                    index === 1 && o.floors > 1 ? 1.55 : 2.05,
+                  ),
+                  material: glass,
+                  distanceDisplayCondition: new C.DistanceDisplayCondition(
+                    0,
+                    1800,
+                  ),
+                },
+              }),
+            );
+            [-1, 1].forEach((side) =>
+              v.entities.add({
+                id: `${o.id}:side-glass-${side}`,
+                position: position(
+                  localPoint(side * o.width * 0.43, 0),
+                  o.elevation + 2.25,
+                ),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(0.16, o.depth * 0.36, 1.65),
+                  material: glass,
+                  distanceDisplayCondition: new C.DistanceDisplayCondition(
+                    0,
+                    1800,
+                  ),
+                },
+              }),
+            );
+            v.entities.add({
+              id: `${o.id}:timber-entry`,
+              position: position(
+                localPoint(o.width * 0.08, front + 0.06),
+                o.elevation + 1.55,
+              ),
+              orientation,
+              box: {
+                dimensions: new C.Cartesian3(o.width * 0.13, 0.22, 3.1),
+                material: timber,
+              },
+            });
+            if (o.floors > 1 || isVilla) {
+              v.entities.add({
+                id: `${o.id}:balcony`,
+                position: position(
+                  localPoint(-o.width * 0.23, front + 0.72),
+                  o.elevation + totalHeight * 0.55,
+                ),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(o.width * 0.35, 1.55, 0.2),
+                  material:
+                    C.Color.fromCssColorString("#d6d0c5").withAlpha(opacity),
+                },
+              });
+              v.entities.add({
+                id: `${o.id}:balcony-glass`,
+                position: position(
+                  localPoint(-o.width * 0.23, front + 1.43),
+                  o.elevation + totalHeight * 0.55 + 0.48,
+                ),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(o.width * 0.34, 0.08, 0.9),
+                  material: glass.withAlpha(opacity * 0.72),
+                },
+              });
+            }
+            v.entities.add({
+              id: `${o.id}:driveway`,
+              polygon: polygon(
+                [
+                  localPoint(-1.8, o.depth * 0.42),
+                  localPoint(1.8, o.depth * 0.42),
+                  localPoint(1.8, o.depth * 0.78),
+                  localPoint(-1.8, o.depth * 0.78),
+                ],
+                o.elevation + 0.07,
+                0.04,
+                C.Color.fromCssColorString("#c8c3b8").withAlpha(opacity),
+              ),
+            });
           } else if (useHouseModel) {
             e.position = position(o.points[0], o.elevation + 0.2);
             e.orientation = C.Transforms.headingPitchRollQuaternion(
@@ -1023,7 +1425,10 @@ export function Viewport(props: Props) {
               footprint(o),
               o.elevation + 0.2,
               o.floors * o.floorHeight,
-              color.withAlpha(objectOpacity(o)),
+              (isCinematicTower
+                ? C.Color.fromCssColorString("#d9d6cf")
+                : color
+              ).withAlpha(objectOpacity(o)),
             );
             v.entities.add({
               id: `${o.id}:roof-cap`,
@@ -1036,6 +1441,71 @@ export function Viewport(props: Props) {
                 ),
               ),
             });
+            if (isCinematicTower) {
+              const opacity = objectOpacity(o),
+                angle = (o.rotation * Math.PI) / 180,
+                orientation = C.Transforms.headingPitchRollQuaternion(
+                  position(o.points[0]),
+                  new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
+                ),
+                localPoint = (across: number, forward: number): Point => [
+                  o.points[0][0] +
+                    Math.cos(angle) * across -
+                    Math.sin(angle) * forward,
+                  o.points[0][1] +
+                    Math.sin(angle) * across +
+                    Math.cos(angle) * forward,
+                ],
+                towerHeight = o.floors * o.floorHeight;
+              v.entities.add({
+                id: `${o.id}:glass-spine`,
+                position: position(
+                  localPoint(0, o.depth * 0.5 + 0.14),
+                  o.elevation + towerHeight * 0.52,
+                ),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(
+                    o.width * 0.36,
+                    0.28,
+                    towerHeight * 0.86,
+                  ),
+                  material: C.Color.fromCssColorString("#50839a").withAlpha(
+                    opacity * 0.94,
+                  ),
+                },
+              });
+              v.entities.add({
+                id: `${o.id}:colour-spine`,
+                position: position(
+                  localPoint(-o.width * 0.34, o.depth * 0.5 + 0.1),
+                  o.elevation + towerHeight * 0.5,
+                ),
+                orientation,
+                box: {
+                  dimensions: new C.Cartesian3(
+                    o.width * 0.09,
+                    0.24,
+                    towerHeight * 0.92,
+                  ),
+                  material: color.withAlpha(opacity),
+                },
+              });
+              for (let floor = 2; floor < o.floors; floor += 3)
+                v.entities.add({
+                  id: `${o.id}:terrace-${floor}`,
+                  position: position(
+                    localPoint(0, o.depth * 0.5 + 0.65),
+                    o.elevation + floor * o.floorHeight,
+                  ),
+                  orientation,
+                  box: {
+                    dimensions: new C.Cartesian3(o.width * 0.9, 1.55, 0.22),
+                    material:
+                      C.Color.fromCssColorString("#eee8dc").withAlpha(opacity),
+                  },
+                });
+            }
             if (isMosque) {
               const opacity = objectOpacity(o);
               v.entities.add({
@@ -1094,7 +1564,7 @@ export function Viewport(props: Props) {
                 });
               });
             }
-            if (o.assetRef.startsWith("builtin:society:")) {
+            if (o.assetRef.startsWith("builtin:society:") || isCinematicTower) {
               v.entities.add({
                 id: `${o.id}:label`,
                 position: position(
@@ -1102,7 +1572,9 @@ export function Viewport(props: Props) {
                   o.elevation + o.floors * o.floorHeight + 5.5,
                 ),
                 label: {
-                  show: props.viewMode !== "street",
+                  show:
+                    props.viewMode !== "street" &&
+                    props.viewMode !== "cinematic",
                   text: o.name,
                   font: "600 14px sans-serif",
                   fillColor: C.Color.fromCssColorString("#172b4d"),
@@ -1181,7 +1653,12 @@ export function Viewport(props: Props) {
             position(o.points[0]),
             new C.HeadingPitchRoll((-o.rotation * Math.PI) / 180, 0, 0),
           );
-          if (!useHouseModel && !customUri && !useFacilityGeometry) {
+          if (
+            !useHouseModel &&
+            !isCinematicHouse &&
+            !customUri &&
+            !useFacilityGeometry
+          ) {
             const angle = (o.rotation * Math.PI) / 180,
               localPoint = (across: number, forward: number): Point => [
                 o.points[0][0] +
@@ -1282,6 +1759,7 @@ export function Viewport(props: Props) {
           }
           if (
             !useHouseModel &&
+            !isCinematicHouse &&
             !customUri &&
             !isMosque &&
             o.roof === "pitched"
@@ -1765,27 +2243,47 @@ export function Viewport(props: Props) {
     }
     // A single transient highlight avoids mutating stored design objects.
     v.entities.removeById("_selection");
+    v.entities.removeById("_selection:boundary");
     for (const entity of [...v.entities.values])
       if (typeof entity.id === "string" && entity.id.startsWith("_handle:"))
         v.entities.remove(entity);
     const selected = p.objects.find((o) => o.id === props.selected);
     if (selected && !props.navigationMode) {
-      v.entities.add({
-        id: "_selection",
-        position: position(
-          selected.points[0],
-          selected.kind === "building"
-            ? selected.floors * selected.floorHeight + 8
-            : 12,
-        ),
-        point: {
-          pixelSize: 10,
-          color: C.Color.fromCssColorString("#f8b84b"),
-          outlineColor: C.Color.WHITE,
-          outlineWidth: 2,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      });
+      if (selected.kind === "boundary") {
+        v.entities.add({
+          id: "_selection:boundary",
+          polygon: polygon(
+            selected.points,
+            0.2,
+            0,
+            C.Color.fromCssColorString("#5b9fe8").withAlpha(0.22),
+          ),
+          polyline: {
+            positions: [...selected.points, selected.points[0]].map((q) =>
+              position(q, 0.6),
+            ),
+            width: 3,
+            material: C.Color.fromCssColorString("#2477bd").withAlpha(0.9),
+          },
+        });
+      } else {
+        v.entities.add({
+          id: "_selection",
+          position: position(
+            selected.points[0],
+            selected.kind === "building"
+              ? selected.floors * selected.floorHeight + 8
+              : 12,
+          ),
+          point: {
+            pixelSize: 10,
+            color: C.Color.fromCssColorString("#f8b84b"),
+            outlineColor: C.Color.WHITE,
+            outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        });
+      }
       const handles: { point: Point; index: number }[] = [
         "building",
         "bridge",
@@ -2106,6 +2604,68 @@ export function Viewport(props: Props) {
     terrainVersion,
   ]);
   useEffect(() => {
+    const v = viewer.current,
+      boundaries = props.project.objects.filter(
+        (object) => object.kind === "boundary",
+      );
+    if (!v || !terrainActive.current || !boundaries.length) {
+      props.onTerrainAnalysis({ available: false });
+      return;
+    }
+    let cancelled = false;
+    const samplesByBoundary = boundaries.map((boundary) => {
+        const centre: Point = [
+          boundary.points.reduce((sum, point) => sum + point[0], 0) /
+            boundary.points.length,
+          boundary.points.reduce((sum, point) => sum + point[1], 0) /
+            boundary.points.length,
+        ];
+        return [...boundary.points, centre];
+      }),
+      points = samplesByBoundary.flat(),
+      samples = points.map((point) => {
+        const [lon, lat] = toGeo(point, props.project.origin);
+        return C.Cartographic.fromDegrees(lon, lat);
+      });
+    C.sampleTerrainMostDetailed(v.terrainProvider, samples)
+      .then((sampled) => {
+        if (cancelled || v.isDestroyed()) return;
+        const heights = sampled.map((sample) => sample.height || 0);
+        let offset = 0;
+        const slopes = samplesByBoundary.flatMap((boundaryPoints) => {
+          const ring = boundaryPoints.slice(0, -1),
+            ringHeights = heights.slice(offset, offset + ring.length);
+          offset += boundaryPoints.length;
+          return ring.map((point, index) => {
+            const next = ring[(index + 1) % ring.length],
+              horizontal = distance(point, next);
+            return horizontal
+              ? (Math.abs(
+                  ringHeights[index] -
+                    ringHeights[(index + 1) % ringHeights.length],
+                ) /
+                  horizontal) *
+                  100
+              : 0;
+          });
+        });
+        const minimumM = Math.min(...heights),
+          maximumM = Math.max(...heights);
+        props.onTerrainAnalysis({
+          available: true,
+          minimumM,
+          maximumM,
+          rangeM: maximumM - minimumM,
+          maximumSlopePercent: Math.max(0, ...slopes),
+          sampledAt: new Date().toISOString(),
+        });
+      })
+      .catch(() => props.onTerrainAnalysis({ available: false }));
+    return () => {
+      cancelled = true;
+    };
+  }, [props.project.origin, props.project.objects, terrainVersion]);
+  useEffect(() => {
     const v = viewer.current;
     if (!v) return;
     if (props.action.type === "zoom-in" || props.action.type === "zoom-out") {
@@ -2297,8 +2857,79 @@ export function Viewport(props: Props) {
         });
       return;
     }
+    if (props.action.type.startsWith("cinematic-")) {
+      const boundary = props.project.objects.find(
+          (object) => object.kind === "boundary",
+        ),
+        boundaryPoints = boundary?.points || [[0, 0]],
+        centre: Point = [
+          boundaryPoints.reduce((sum, point) => sum + point[0], 0) /
+            boundaryPoints.length,
+          boundaryPoints.reduce((sum, point) => sum + point[1], 0) /
+            boundaryPoints.length,
+        ],
+        minX = Math.min(...boundaryPoints.map((point) => point[0])),
+        minY = Math.min(...boundaryPoints.map((point) => point[1])),
+        landmark = props.project.objects.find(
+          (object) =>
+            /mosque|church|temple|gurdwara|civic|landmark/i.test(object.name) &&
+            object.kind === "building",
+        );
+      if (props.action.type === "cinematic-aerial") {
+        const radius = Math.max(
+          300,
+          ...boundaryPoints.map((point) =>
+            Math.hypot(point[0] - centre[0], point[1] - centre[1]),
+          ),
+        );
+        v.camera.flyToBoundingSphere(
+          new C.BoundingSphere(
+            C.Cartesian3.fromDegrees(...toGeo(centre, props.project.origin)),
+            radius,
+          ),
+          {
+            duration: 1.4,
+            offset: new C.HeadingPitchRange(-0.72, -0.56, radius * 1.05),
+          },
+        );
+        return;
+      }
+      const eye: Point =
+          props.action.type === "cinematic-entrance"
+            ? [centre[0], minY + 18]
+            : props.action.type === "cinematic-landmarks" && landmark
+              ? [landmark.points[0][0], landmark.points[0][1] - 95]
+              : [minX + 15, -220],
+        target: Point =
+          props.action.type === "cinematic-landmarks" && landmark
+            ? landmark.points[0]
+            : props.action.type === "cinematic-boulevard"
+              ? [centre[0] + 360, -220]
+              : [centre[0], centre[1] + 160],
+        direction: Point = [target[0] - eye[0], target[1] - eye[1]],
+        ll = toGeo(eye, props.project.origin);
+      v.camera.flyTo({
+        destination: C.Cartesian3.fromDegrees(
+          ...ll,
+          props.action.type === "cinematic-landmarks"
+            ? 20
+            : props.action.type === "cinematic-entrance"
+              ? 11
+              : 9,
+        ),
+        orientation: {
+          heading: Math.atan2(direction[0], direction[1]),
+          pitch: props.action.type === "cinematic-landmarks" ? -0.18 : -0.11,
+          roll: 0,
+        },
+        duration: 1.2,
+      });
+      return;
+    }
     const o = props.project.objects.find((o) => o.id === props.action.id);
-    const points = o?.points ||
+    const points = (o && ["building", "bridge"].includes(o.kind)
+      ? footprint(o)
+      : o?.points) ||
       props.project.objects.find((o) => o.kind === "boundary")?.points || [
         [0, 0],
       ];
@@ -2306,17 +2937,32 @@ export function Viewport(props: Props) {
       points.reduce((s, q) => s + q[0], 0) / points.length,
       points.reduce((s, q) => s + q[1], 0) / points.length,
     ];
+    const objectHeight =
+      o?.kind === "building" ? o.floors * o.floorHeight * o.scale : 0;
+    const targetHeight = ["3d", "cinematic"].includes(props.viewMode)
+      ? objectHeight / 2
+      : 0;
     const radius = Math.max(
-      o ? 65 : 300,
+      o ? Math.max(8, (o.width * o.scale) / 2) : 300,
+      targetHeight,
       ...points.map((q) => Math.hypot(q[0] - center[0], q[1] - center[1])),
     );
     const ll = toGeo(center, props.project.origin);
     if (props.action.type === "frame" && props.viewMode === "street") {
+      const heading = v.camera.heading;
+      const standOff = o ? Math.max(15, radius * 1.8) : 20;
+      const approach = toGeo(
+        [
+          center[0] - Math.sin(heading) * standOff,
+          center[1] - Math.cos(heading) * standOff,
+        ],
+        props.project.origin,
+      );
       v.camera.flyTo({
-        destination: C.Cartesian3.fromDegrees(...ll, 8),
+        destination: C.Cartesian3.fromDegrees(...approach, 1.7),
         orientation: {
-          heading: v.camera.heading,
-          pitch: -0.18,
+          heading,
+          pitch: 0,
           roll: 0,
         },
         duration: 0.6,
@@ -2324,22 +2970,30 @@ export function Viewport(props: Props) {
       return;
     }
     const preservePerspective =
-      props.action.type === "frame" && props.viewMode === "3d";
+      props.action.type === "frame" &&
+      ["3d", "cinematic"].includes(props.viewMode);
     v.camera.flyToBoundingSphere(
-      new C.BoundingSphere(C.Cartesian3.fromDegrees(...ll), radius),
+      new C.BoundingSphere(
+        C.Cartesian3.fromDegrees(...ll, targetHeight),
+        radius,
+      ),
       {
         duration: 0.6,
         offset: new C.HeadingPitchRange(
           props.action.type === "drone"
             ? -0.78
-            : props.action.type === "perspective" || preservePerspective
-              ? -0.58
-              : 0,
+            : preservePerspective
+              ? v.camera.heading
+              : props.action.type === "perspective"
+                ? -0.58
+                : 0,
           props.action.type === "drone"
             ? -0.68
-            : props.action.type === "perspective" || preservePerspective
-              ? -0.52
-              : -Math.PI / 2,
+            : preservePerspective
+              ? Math.min(-0.25, Math.max(-1.35, v.camera.pitch))
+              : props.action.type === "perspective"
+                ? -0.52
+                : -Math.PI / 2,
           radius *
             (props.action.type === "drone"
               ? 1.35
@@ -2367,7 +3021,9 @@ export function Viewport(props: Props) {
               ? "2D map"
               : props.viewMode === "3d"
                 ? "3D view"
-                : "street view"}
+                : props.viewMode === "street"
+                  ? "street view"
+                  : "cinematic view"}
             …
           </span>
           <div className="view-loader-progress">

@@ -22,7 +22,7 @@ class DesignObject(BaseModel):
     elevation: float = Field(ge=0, le=100)
     lanes: int = Field(ge=1, le=8)
     roof: Literal['flat', 'pitched']
-    buildingType: Literal['Detached house', 'Townhouse', 'Apartment', 'Commercial']
+    buildingType: Literal['Detached house', 'Townhouse', 'Apartment', 'Commercial', 'Place of worship', 'School', 'Clinic', 'Community']
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
     assetRef: str = Field(max_length=100)
 
@@ -64,6 +64,10 @@ class DataLayer(BaseModel):
     opacity: float = Field(ge=0, le=1)
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
     source: str = Field(max_length=200)
+    hazardType: Literal['flood', 'liquefaction', 'coastal', 'fault', 'contamination'] | None = None
+    hazardSeverity: Literal['information', 'review', 'avoid'] | None = None
+    confidence: Literal['authoritative', 'indicative', 'unknown'] | None = None
+    sourceDate: str | None = Field(default=None, max_length=40)
     features: list[DataFeature] = Field(max_length=50000)
 
 class DesignLayer(BaseModel):
@@ -72,9 +76,78 @@ class DesignLayer(BaseModel):
     visible: bool
     opacity: float = Field(ge=0, le=1)
 
+class ProjectLayer(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    id: UUID
+    sourceProjectId: UUID
+    name: str = Field(min_length=1, max_length=100)
+    origin: tuple[float, float]
+    visible: bool
+    opacity: float = Field(ge=0, le=1)
+    locked: bool
+    objects: list[DesignObject] = Field(max_length=2000)
+    designLayers: list[DesignLayer] = Field(max_length=8)
+
+class PlanningSettings(BaseModel):
+    # Ignore retired unit fields when an older saved project is opened.
+    model_config = ConfigDict(extra='ignore', allow_inf_nan=False)
+    unitSystem: Literal['metric', 'imperial'] = 'metric'
+    residentsPerUnit: float = Field(default=4, ge=1, le=10)
+    parkingSpacesPerUnit: float = Field(default=1.5, ge=0, le=5)
+    maximumSiteCoveragePercent: float = Field(default=45, ge=1, le=100)
+    minimumGreenSpacePercent: float = Field(default=15, ge=0, le=100)
+    maximumRoadAccessDistanceM: float = Field(default=20, ge=1, le=500)
+
+class DataSource(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    id: UUID
+    name: str = Field(min_length=1, max_length=100)
+    kind: Literal['basemap', 'terrain', 'context', 'hazard', 'rules']
+    url: str = Field(max_length=500)
+    license: str = Field(max_length=200)
+    fetchedAt: str
+    resolution: str = Field(max_length=100)
+    confidence: Literal['authoritative', 'indicative', 'unknown']
+
+class Zone(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    id: UUID
+    name: str = Field(min_length=1, max_length=100)
+    type: Literal['residential', 'commercial', 'mixed-use', 'education', 'health', 'faith', 'recreation', 'cemetery', 'utility', 'protected']
+    parcelIds: list[UUID] = Field(max_length=2000)
+    allowedBuildingTypes: list[Literal['Detached house', 'Townhouse', 'Apartment', 'Commercial', 'Place of worship', 'School', 'Clinic', 'Community']] = Field(max_length=8)
+    frontSetbackM: float = Field(ge=0, le=100)
+    sideSetbackM: float = Field(ge=0, le=100)
+    rearSetbackM: float = Field(ge=0, le=100)
+    maximumFloors: int = Field(ge=1, le=60)
+    maximumCoveragePercent: float = Field(ge=1, le=100)
+    maximumFar: float = Field(ge=.1, le=20)
+    minimumPlotAreaM2: float = Field(ge=1, le=1_000_000)
+
+class ScenarioSnapshot(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    id: UUID
+    name: str = Field(min_length=1, max_length=100)
+    createdAt: str
+    objects: list[DesignObject] = Field(max_length=2000)
+
+class UtilityNetwork(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    id: UUID
+    name: str = Field(min_length=1, max_length=100)
+    type: Literal['water', 'wastewater', 'stormwater', 'electricity', 'telecom']
+    sourceRoadId: UUID | None = None
+    points: list[tuple[float, float]] = Field(min_length=2, max_length=500)
+    capacity: float = Field(ge=0, le=1_000_000)
+    capacityUnit: str = Field(min_length=1, max_length=30)
+    connectionDistanceM: float = Field(ge=1, le=500)
+    connectedObjectIds: list[UUID] = Field(max_length=2000)
+    source: str = Field(max_length=200)
+    confidence: Literal['authoritative', 'indicative', 'unknown']
+
 class Project(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
-    schemaVersion: Literal[1, 2]
+    schemaVersion: Literal[1, 2, 3, 4]
     id: UUID
     name: str = Field(min_length=1, max_length=100)
     revision: int = Field(ge=0)
@@ -86,6 +159,12 @@ class Project(BaseModel):
     objects: list[DesignObject] = Field(max_length=2000)
     dataLayers: list[DataLayer] = Field(default_factory=list, max_length=100)
     designLayers: list[DesignLayer] = Field(default_factory=list, max_length=8)
+    projectLayers: list[ProjectLayer] = Field(default_factory=list, max_length=20)
+    planningSettings: PlanningSettings = Field(default_factory=PlanningSettings)
+    dataSources: list[DataSource] = Field(default_factory=list, max_length=100)
+    zones: list[Zone] = Field(default_factory=list, max_length=500)
+    alternatives: list[ScenarioSnapshot] = Field(default_factory=list, max_length=10)
+    utilityNetworks: list[UtilityNetwork] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode='after')
     def validate_design(self):
@@ -95,8 +174,6 @@ class Project(BaseModel):
         if len(set(ids)) != len(ids):
             raise ValueError('Duplicate object IDs')
         boundaries = [o for o in self.objects if o.kind == 'boundary']
-        if len(boundaries) > 1:
-            raise ValueError('One boundary per project')
         nodes = {}
         for o in self.objects:
             if o.scenarioId != self.scenarioId:
@@ -114,8 +191,15 @@ class Project(BaseModel):
                     x, y = o.points[0]
                     scale = o.scale if o.kind == 'bridge' else 1
                     points = [(x+scale*(u*cos(a)-v*sin(a)),y+scale*(u*sin(a)+v*cos(a))) for u,v in [(-o.width/2,-o.depth/2),(o.width/2,-o.depth/2),(o.width/2,o.depth/2),(-o.width/2,o.depth/2)]]
-                boundary = Polygon(boundaries[0].points).buffer(.01)
-                if any(not boundary.covers(Point(p)) for p in points):
+                candidate_boundaries = [Polygon(item.points).buffer(.01) for item in boundaries]
+                if o.kind == 'road' and o.assetRef == 'builtin:road:external-access':
+                    has_inside = any(any(boundary.covers(Point(point)) for boundary in candidate_boundaries) for point in points)
+                    has_outside = any(not any(boundary.covers(Point(point)) for boundary in candidate_boundaries) for point in points)
+                    if not has_inside or not has_outside:
+                        raise ValueError(f'{o.name} must connect inside and outside the site')
+                    continue
+                boundary = next((item for item in candidate_boundaries if all(item.covers(Point(p)) for p in points)), None)
+                if boundary is None:
                     raise ValueError(f'{o.name} outside project boundary')
                 shape = LineString(points).buffer(o.width/2, quad_segs=6) if o.kind == 'road' else Polygon(points) if len(points) >= 3 else Point(points[0])
                 if not boundary.covers(shape):

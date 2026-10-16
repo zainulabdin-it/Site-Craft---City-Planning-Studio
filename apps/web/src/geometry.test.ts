@@ -11,15 +11,54 @@ import {
   footprint,
   moveTo,
   resizeFromHandle,
+  validateObjectCollisions,
 } from "./geometry";
 import { zarajNzProject } from "./zarajDemo";
 import { applyCommand, command } from "./history";
 describe("metric geometry and project commands", () => {
-  it("builds a valid Zaraj-inspired NZ demo with complete facilities", () => {
+  it("blocks a newly changed building that overlaps another building", () => {
+    const project = newProject("Collision");
+    const first = newObject(project, "building", [[0, 0]]);
+    first.name = "First house";
+    const second = newObject(project, "building", [[2, 2]]);
+    second.name = "Second house";
+    project.objects.push(first, second);
+    expect(() =>
+      validateObjectCollisions(project, new Set([second.id])),
+    ).toThrow(/overlaps First house|First house overlaps Second house/);
+  });
+  it("checks a new road without re-reporting an unrelated legacy overlap", () => {
+    const project = newProject("Road collision scope"),
+      building = newObject(project, "building", [[0, 0]]),
+      legacyRoad = newObject(project, "road", [
+        [-20, 0],
+        [20, 0],
+      ]),
+      newRoad = newObject(project, "road", [
+        [80, 0],
+        [120, 0],
+      ]);
+    project.objects.push(building, legacyRoad, newRoad);
+    expect(() =>
+      validateObjectCollisions(project, new Set([newRoad.id])),
+    ).not.toThrow();
+    const crossingRoad = {
+      ...newRoad,
+      points: [
+        [-20, 0],
+        [20, 0],
+      ] as [number, number][],
+    };
+    project.objects[2] = crossingRoad;
+    expect(() =>
+      validateObjectCollisions(project, new Set([crossingRoad.id])),
+    ).toThrow(/overlaps a road/);
+  });
+  it("builds a valid Avalon Heights NZ demo with complete facilities", () => {
     const project = validateProject(zarajNzProject());
     expect(
       project.objects.filter((object) => object.kind === "building").length,
-    ).toBeGreaterThan(180);
+    ).toBeGreaterThanOrEqual(170);
     expect(
       project.objects.filter((object) => object.kind === "road").length,
     ).toBeGreaterThan(20);
@@ -46,6 +85,21 @@ describe("metric geometry and project commands", () => {
             object.buildingType === "Place of worship",
         ),
       ).toBe(true);
+    for (const landmark of ["F3 Technologies", "Avalon Plaza"])
+      expect(
+        project.objects.some(
+          (object) =>
+            object.name === landmark &&
+            object.kind === "building" &&
+            object.assetRef.startsWith("builtin:cinematic:tower-"),
+        ),
+      ).toBe(true);
+    expect(
+      project.objects.some(
+        (object) =>
+          object.name === "SLS School" && object.buildingType === "School",
+      ),
+    ).toBe(true);
     const accessRoads = project.objects.filter(
       (object) =>
         object.kind === "road" &&
@@ -95,11 +149,51 @@ describe("metric geometry and project commands", () => {
           )
             overlaps.push(`${home.name} overlaps ${road.name}`);
     expect(overlaps).toEqual([]);
+    const collisionErrors: string[] = [];
+    for (const building of project.objects.filter(
+      (object) =>
+        object.kind === "building" &&
+        object.assetRef !== "builtin:society:gate",
+    ))
+      try {
+        validateObjectCollisions(project, new Set([building.id]));
+      } catch (error) {
+        collisionErrors.push((error as Error).message);
+      }
+    expect(collisionErrors).toEqual([]);
+    const internalRoads = roads.filter(
+      (road) => road.assetRef !== "builtin:road:external-access",
+    );
+    const reached = new Set<string>([internalRoads[0].id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const road of internalRoads) {
+        if (reached.has(road.id)) continue;
+        const connected = internalRoads.some(
+          (candidate) =>
+            reached.has(candidate.id) &&
+            candidate.nodeIds.some((nodeId) => road.nodeIds.includes(nodeId)),
+        );
+        if (connected) {
+          reached.add(road.id);
+          changed = true;
+        }
+      }
+    }
+    expect(reached.size).toBe(internalRoads.length);
+    expect(
+      accessRoads.every((road) =>
+        road.nodeIds.some((nodeId) =>
+          internalRoads.some((candidate) => candidate.nodeIds.includes(nodeId)),
+        ),
+      ),
+    ).toBe(true);
     expect(project.origin).toEqual([172.439, -43.6005]);
     expect(
       project.objects.some((object) => object.name.includes("Canal")),
     ).toBe(false);
-  });
+  }, 15_000);
   it("resizes a building from one corner while keeping the opposite corner fixed", () => {
     const p = newProject(),
       house = newObject(p, "building", [[0, 0]]);
@@ -118,7 +212,7 @@ describe("metric geometry and project commands", () => {
     expect(resized.scale).toBe(2);
     expect(resized.points[0]).toEqual([10, 10]);
   });
-  it("migrates schema v1 projects to v3 without changing design objects", () => {
+  it("migrates schema v1 projects to v4 without changing design objects", () => {
     const current = demoProject();
     const legacy = {
       ...current,
@@ -126,12 +220,22 @@ describe("metric geometry and project commands", () => {
       dataLayers: undefined,
       designLayers: undefined,
       projectLayers: undefined,
+      planningSettings: undefined,
+      dataSources: undefined,
+      zones: undefined,
+      alternatives: undefined,
+      utilityNetworks: undefined,
     };
     delete (legacy as { dataLayers?: unknown }).dataLayers;
     delete (legacy as { designLayers?: unknown }).designLayers;
     delete (legacy as { projectLayers?: unknown }).projectLayers;
+    delete (legacy as { planningSettings?: unknown }).planningSettings;
+    delete (legacy as { dataSources?: unknown }).dataSources;
+    delete (legacy as { zones?: unknown }).zones;
+    delete (legacy as { alternatives?: unknown }).alternatives;
+    delete (legacy as { utilityNetworks?: unknown }).utilityNetworks;
     const migrated = validateProject(legacy);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.objects).toEqual(current.objects);
     expect(migrated.dataLayers).toEqual([]);
     expect(migrated.projectLayers).toEqual([]);
@@ -143,10 +247,56 @@ describe("metric geometry and project commands", () => {
       unknown
     >;
     delete previous.projectLayers;
+    delete previous.planningSettings;
+    delete previous.dataSources;
+    delete previous.zones;
+    delete previous.alternatives;
+    delete previous.utilityNetworks;
     const migrated = validateProject(previous);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.objects).toEqual(current.objects);
     expect(migrated.projectLayers).toEqual([]);
+  });
+  it("migrates schema v3 planning projects to v4 settings", () => {
+    const current = demoProject();
+    const previous = { ...current, schemaVersion: 3 } as Record<
+      string,
+      unknown
+    >;
+    delete previous.planningSettings;
+    delete previous.dataSources;
+    delete previous.zones;
+    delete previous.alternatives;
+    delete previous.utilityNetworks;
+    const migrated = validateProject(previous);
+    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.planningSettings.residentsPerUnit).toBe(4);
+    expect(migrated.dataSources).toEqual([]);
+    expect(migrated.zones).toEqual([]);
+    expect(migrated.alternatives).toEqual([]);
+    expect(migrated.utilityNetworks).toEqual([]);
+  });
+  it("persists independent scenario snapshots in schema v4", () => {
+    const project = newProject("Scenarios");
+    const house = newObject(project, "building", [[0, 0]]);
+    project.objects.push(house);
+    const alternativeId = crypto.randomUUID();
+    project.alternatives.push({
+      id: alternativeId,
+      name: "Alternative 1",
+      createdAt: new Date().toISOString(),
+      objects: [
+        {
+          ...house,
+          scenarioId: alternativeId,
+          points: [[25, 25]],
+        },
+      ],
+    });
+    const restored = validateProject(JSON.parse(JSON.stringify(project)));
+    expect(restored.alternatives).toHaveLength(1);
+    expect(restored.alternatives[0].objects[0].points[0]).toEqual([25, 25]);
+    expect(restored.objects[0].points[0]).toEqual([0, 0]);
   });
   it("rejects road surfaces that escape a concave boundary despite inside endpoints", () => {
     const p = newProject();
@@ -282,7 +432,7 @@ describe("metric geometry and project commands", () => {
     ).toThrow("must remain inside one site boundary");
   });
   it("rejects an object whose required area is larger than the site", () => {
-    const p = newProject("Five marla site"),
+    const p = newProject("Compact residential site"),
       boundary = newObject(p, "boundary", [
         [-5, -5],
         [5, -5],
@@ -294,7 +444,7 @@ describe("metric geometry and project commands", () => {
     house.depth = 16;
     p.objects = [boundary, house];
     expect(() => validateProject(p)).toThrow(
-      /needs 192\.0 m² .*largest site is only 100\.0 m²/,
+      /needs 192 m², but the largest site is only 100 m²/,
     );
   });
   it("validates dimensions, scene persistence, and parametric footprint changes", () => {

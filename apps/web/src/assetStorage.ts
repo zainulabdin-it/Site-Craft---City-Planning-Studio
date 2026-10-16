@@ -21,6 +21,9 @@ export type CustomAsset = {
   createdAt: string;
   blob: Blob;
 };
+export type EmbeddedCustomAsset = Omit<CustomAsset, "blob"> & {
+  dataBase64: string;
+};
 
 const DB_NAME = "sitecraft.assets.v1";
 const STORE = "assets";
@@ -87,6 +90,53 @@ export async function importCustomAsset(
   registerUrl(asset);
   window.dispatchEvent(new Event("sitecraft-assets-changed"));
   return asset;
+}
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+export async function exportCustomAssets(
+  assetIds: string[],
+): Promise<EmbeddedCustomAsset[]> {
+  const wanted = new Set(assetIds),
+    assets = (await listCustomAssets()).filter((asset) => wanted.has(asset.id));
+  return Promise.all(
+    assets.map(async ({ blob, ...asset }) => ({
+      ...asset,
+      dataBase64: await blobToBase64(blob),
+    })),
+  );
+}
+
+export async function restoreCustomAssets(assets: EmbeddedCustomAsset[]) {
+  const db = await database();
+  try {
+    const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+    for (const embedded of assets) {
+      if (!embedded.id || embedded.size > 25 * 1024 * 1024)
+        throw Error("A packaged custom asset is invalid or too large.");
+      const binary = atob(embedded.dataBase64),
+        bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      if (String.fromCharCode(...bytes.slice(0, 4)) !== "glTF")
+        throw Error(`${embedded.fileName} is not a valid GLB asset.`);
+      const { dataBase64: _dataBase64, ...metadata } = embedded,
+        asset: CustomAsset = {
+          ...metadata,
+          blob: new Blob([bytes], { type: "model/gltf-binary" }),
+        };
+      await request(store.put(asset));
+      registerUrl(asset);
+    }
+  } finally {
+    db.close();
+  }
+  window.dispatchEvent(new Event("sitecraft-assets-changed"));
 }
 
 function registerUrl(asset: CustomAsset) {

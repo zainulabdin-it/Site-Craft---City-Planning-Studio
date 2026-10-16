@@ -7,7 +7,7 @@ import {
 } from "./model";
 
 export function zarajNzProject() {
-  const p = newProject("Zaraj-inspired Rolleston Society · NZ"),
+  const p = newProject("Avalon Heights Society · NZ"),
     add = (
       kind: Kind,
       points: Point[],
@@ -45,7 +45,7 @@ export function zarajNzProject() {
 
   // Dry north-east Rolleston field; Selwyn Road sits south of the site.
   p.origin = [172.439, -43.6005];
-  p.scenarioName = "Zaraj reference master plan · professional NZ demo";
+  p.scenarioName = "Avalon Heights master plan · professional NZ demo";
   add(
     "boundary",
     [
@@ -54,122 +54,66 @@ export function zarajNzProject() {
       [500, 380],
       [-500, 380],
     ],
-    "Zaraj NZ society · 76 ha boundary",
+    "Avalon Heights · 76 ha boundary",
     { color: "#12a889" },
   );
 
-  // 27 m main boulevard, 18 m sector collectors and 12 m residential streets.
+  // A true connected hierarchy: every crossing below uses the same exact
+  // coordinate. Shared node IDs are assigned at the end of the generator.
+  const localStreetYs = [-315, -120, 40, 245],
+    networkXs = [
+      -485, -410, -300, -240, -190, -155, -75, 0, 190, 300, 410, 485,
+    ],
+    networkYs = [-360, -315, -210, -120, 40, 140, 245, 350];
   add(
     "road",
-    [
-      [0, -355],
-      [0, -210],
-      [12, -40],
-      [5, 145],
-      [52, 355],
-    ],
+    networkYs.map((y) => [0, y] as Point),
     "Main Boulevard · 27 m",
     { width: 27, lanes: 4, color: "#374151" },
   );
   add(
     "road",
-    [
-      [-485, -215],
-      [-250, -210],
-      [0, -210],
-      [250, -205],
-      [485, -190],
-    ],
+    networkXs.map((x) => [x, -210] as Point),
     "Central Avenue · 18 m",
     { width: 18, lanes: 2, color: "#46515b" },
   );
   add(
     "road",
-    [
-      [-475, 135],
-      [-250, 120],
-      [5, 145],
-      [250, 155],
-      [480, 135],
-    ],
+    networkXs.map((x) => [x, 140] as Point),
     "Park Avenue · 18 m",
     { width: 18, lanes: 2, color: "#46515b" },
   );
-  add(
-    "road",
-    [
-      [-300, -360],
-      [-300, -210],
-      [-285, -40],
-      [-260, 120],
-      [-230, 350],
-    ],
-    "Sector A Collector",
-    { width: 15, lanes: 2 },
+  [-300, 300].forEach((x, index) =>
+    add(
+      "road",
+      networkYs.map((y) => [x, y] as Point),
+      `Sector ${index ? "C" : "A"} Collector`,
+      { width: 15, lanes: 2, color: "#46515b" },
+    ),
   );
-  add(
-    "road",
-    [
-      [300, -360],
-      [300, -205],
-      [285, -25],
-      [270, 150],
-      [250, 355],
-    ],
-    "Sector C Collector",
-    { width: 15, lanes: 2 },
-  );
-  [-315, -120, 40, 245].forEach((y, i) => {
-    add(
-      "road",
-      [
-        [-485, y],
-        [-305, y + (i % 2 ? 5 : -5)],
-      ],
-      `Sector A Street ${i + 1}`,
-      { width: 12 },
-    );
-    add(
-      "road",
-      [
-        [-295, y],
-        [-15, y + (i % 2 ? -4 : 4)],
-      ],
-      `Sector B-West Street ${i + 1}`,
-      { width: 12 },
-    );
-    add(
-      "road",
-      [
-        [20, y + 3],
-        [290, y],
-      ],
-      `Sector B-East Street ${i + 1}`,
-      { width: 12 },
-    );
-    add(
-      "road",
-      [
-        [310, y],
-        [485, y + (i % 2 ? 4 : -4)],
-      ],
-      `Sector C Street ${i + 1}`,
-      { width: 12 },
-    );
+  localStreetYs.forEach((y, row) => {
+    const divisions = [-485, -300, 0, 300, 485];
+    for (let segment = 0; segment < divisions.length - 1; segment++)
+      add(
+        "road",
+        [
+          [divisions[segment], y],
+          [divisions[segment + 1], y],
+        ],
+        `Residential Street ${row + 1}.${segment + 1}`,
+        { width: 12, lanes: 2, color: "#56616a" },
+      );
   });
   [-410, -190, 190, 410].forEach((x, i) =>
     add(
       "road",
-      [
-        [x, -360],
-        [x + (i % 2 ? 12 : -12), 350],
-      ],
+      networkYs.map((y) => [x, y] as Point),
       `Residential Spine ${i + 1}`,
-      { width: 10 },
+      { width: 10, lanes: 2, color: "#59636b" },
     ),
   );
 
-  // Three residential sectors with Zaraj-like plot sizes and varied houses.
+  // Three residential sectors with practical plot sizes and varied houses.
   const houseColors = [
     "#f7e0bc",
     "#d6e9f5",
@@ -189,7 +133,7 @@ export function zarajNzProject() {
   const residentialBands = [
     {
       sector: "A",
-      xs: [-470, -445, -375, -345, -325],
+      xs: [-470, -440, -375, -340],
       ys: [
         -345, -275, -175, -150, -85, -45, 5, 75, 105, 175, 205, 285, 320, 345,
       ],
@@ -197,8 +141,7 @@ export function zarajNzProject() {
     {
       sector: "B",
       xs: [
-        -270, -240, -215, -160, -130, -100, -70, -40, 35, 65, 95, 125, 155, 220,
-        250, 275,
+        -270, -235, -195, -155, -115, -75, -35, 35, 75, 115, 155, 205, 245, 275,
       ],
       ys: [
         -345, -275, -175, -150, -85, -45, 5, 75, 105, 175, 205, 285, 320, 345,
@@ -206,7 +149,7 @@ export function zarajNzProject() {
     },
     {
       sector: "C",
-      xs: [330, 355, 380, 440, 465],
+      xs: [335, 370, 435, 470],
       ys: [
         -345, -275, -175, -150, -85, -45, 5, 75, 105, 175, 205, 285, 320, 345,
       ],
@@ -233,7 +176,12 @@ export function zarajNzProject() {
           (band.sector === "A" && y > 155 && x > -400) ||
           (band.sector === "A" && y > -205 && y < -135) ||
           (band.sector === "B" && y === -275 && x < -20) ||
+          (band.sector === "B" && y < -320 && x > -95 && x < -15) ||
+          (band.sector === "B" && y > -195 && y < -135 && x < -215) ||
+          (band.sector === "B" && y > 300 && x > 95 && x < 215) ||
           (band.sector === "C" && y > 75 && y < 140) ||
+          (band.sector === "C" && y > 145 && y < 195 && x > 390) ||
+          (band.sector === "C" && y < -315 && x > 345) ||
           (band.sector === "C" && y > 180 && x > 320)
         )
           continue;
@@ -247,7 +195,7 @@ export function zarajNzProject() {
                 .some(
                   (point, index) =>
                     distanceToSegment([x, y], object.points[index], point) <
-                    object.width / 2 + Math.min(width, depth) / 2 + 1,
+                    object.width / 2 + Math.min(width, depth) / 2 + 3,
                 ),
           );
         if (roadConflict) continue;
@@ -260,7 +208,7 @@ export function zarajNzProject() {
           houseRefs[houseNo % houseRefs.length],
           houseColors[houseNo % houseColors.length],
           houseNo % 7 === 0 ? 2 : 1,
-          ((houseNo % 5) - 2) * 1.5,
+          houseNo % 2 ? 0 : 180,
           houseNo % 9 === 0 ? "Townhouse" : "Detached house",
         );
         houseNo++;
@@ -350,9 +298,9 @@ export function zarajNzProject() {
 
   // Civic, faith, education and health facilities.
   building(
-    -330,
+    -342,
     205,
-    "Zaraj Jamia Mosque",
+    "Avalon Heights Jamia Mosque",
     48,
     38,
     "builtin:society:mosque",
@@ -409,11 +357,12 @@ export function zarajNzProject() {
     "Place of worship",
   );
   [-240, -155, -75].forEach((x, index) => {
+    const facadeY = index === 0 ? -253 : -259;
     add(
       "road",
       [
-        [x, -255],
-        [x, -219],
+        [x, facadeY],
+        [x, -210],
       ],
       `Faith building access ${index + 1}`,
       { width: 5, lanes: 1, color: "#59636b" },
@@ -426,7 +375,7 @@ export function zarajNzProject() {
     });
   });
   building(
-    170,
+    145,
     325,
     "Sector B Primary School",
     64,
@@ -440,7 +389,7 @@ export function zarajNzProject() {
   building(
     365,
     115,
-    "Sector C School",
+    "SLS School",
     56,
     30,
     "builtin:society:school",
@@ -448,6 +397,18 @@ export function zarajNzProject() {
     2,
     0,
     "School",
+  );
+  building(
+    455,
+    165,
+    "F3 Technologies",
+    44,
+    26,
+    "builtin:cinematic:tower-glass",
+    "#2878c8",
+    6,
+    0,
+    "Commercial",
   );
   building(
     -350,
@@ -487,12 +448,16 @@ export function zarajNzProject() {
     building(
       70,
       y,
-      `Main Boulevard plaza ${i + 1}`,
+      i === 4 ? "Avalon Plaza" : `Main Boulevard plaza ${i + 1}`,
       44,
       22,
-      i === 2 ? "builtin:society:supermarket" : "builtin:society:shops",
-      i % 2 ? "#e7a957" : "#d8e2ea",
-      i === 2 ? 2 : 3,
+      i === 4
+        ? "builtin:cinematic:tower-terrace"
+        : i === 2
+          ? "builtin:society:supermarket"
+          : "builtin:society:shops",
+      i === 4 ? "#dc6e54" : i % 2 ? "#e7a957" : "#d8e2ea",
+      i === 4 ? 7 : i === 2 ? 2 : 3,
       0,
       "Commercial",
     );
@@ -571,7 +536,7 @@ export function zarajNzProject() {
   add(
     "road",
     [
-      [0, -355],
+      [0, -360],
       [20, -430],
       [123, -714],
     ],
@@ -586,7 +551,7 @@ export function zarajNzProject() {
   add(
     "road",
     [
-      [485, -190],
+      [485, -210],
       [515, -310],
       [549, -457],
     ],
@@ -599,8 +564,8 @@ export function zarajNzProject() {
     },
   );
   building(
-    488,
-    -188,
+    490,
+    -225,
     "East security gate",
     20,
     9,
@@ -655,7 +620,7 @@ export function zarajNzProject() {
       assetRef: `kenney:car:${i % 3 === 0 ? "suv" : i % 3 === 1 ? "sedan" : "van"}`,
     });
   });
-  [-285, -150, 150, 285].forEach((y, i) => {
+  [-330, -270, -165, -70, 0, 75, 190, 300, 340].forEach((y, i) => {
     add("bench", [[-18, y]], `Boulevard light west ${i + 1}`, {
       scale: 0.82,
       assetRef: "builtin:society:streetlight",
@@ -667,6 +632,32 @@ export function zarajNzProject() {
       color: "#39434d",
     });
   });
+  [-450, -360, -240, -120, 120, 240, 360, 450].forEach((x, i) => {
+    add("bench", [[x, i % 2 ? -224 : -196]], `Central Avenue light ${i + 1}`, {
+      scale: 0.82,
+      assetRef: "builtin:society:streetlight",
+      color: "#39434d",
+    });
+    add("bench", [[x, i % 2 ? 126 : 154]], `Park Avenue light ${i + 1}`, {
+      scale: 0.82,
+      assetRef: "builtin:society:streetlight",
+      color: "#39434d",
+    });
+  });
+  [-300, 300].forEach((x, side) =>
+    [-330, -260, -160, -70, 70, 190, 300, 340].forEach((y, i) =>
+      add(
+        "bench",
+        [[x + (side ? 12 : -12), y]],
+        `Collector light ${side + 1}.${i + 1}`,
+        {
+          scale: 0.78,
+          assetRef: "builtin:society:streetlight",
+          color: "#39434d",
+        },
+      ),
+    ),
+  );
   [-210, 140].forEach((y, i) =>
     add("bench", [[15, y]], `Boulevard traffic signal ${i + 1}`, {
       scale: 0.8,
@@ -680,5 +671,15 @@ export function zarajNzProject() {
       assetRef: "builtin:bench:v1",
     }),
   );
+  // Roads that meet at one coordinate also share a graph node. This keeps
+  // navigation, connectivity checks and future routing honest.
+  const sharedRoadNodes = new Map<string, string>();
+  for (const road of p.objects.filter((object) => object.kind === "road"))
+    road.points.forEach((point, index) => {
+      const key = `${point[0].toFixed(3)}:${point[1].toFixed(3)}`;
+      const nodeId = sharedRoadNodes.get(key) ?? road.nodeIds[index];
+      sharedRoadNodes.set(key, nodeId);
+      road.nodeIds[index] = nodeId;
+    });
   return p;
 }

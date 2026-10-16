@@ -16,6 +16,8 @@ export type SiteAnalysis = {
   intersectingBuildings: number;
   intersectingWaterFeatures: number;
   intersectingLandUse: string[];
+  surface: "land" | "water" | "unknown";
+  surfaceName?: string;
   buildability: "blocked" | "review" | "unknown";
   checkedAt: string;
   notes: string[];
@@ -28,6 +30,117 @@ type OsmElement = {
   center?: { lat: number; lon: number };
   geometry?: { lat: number; lon: number }[];
 };
+
+export type SurfaceCheck = {
+  surface: "land" | "water" | "unknown";
+  name?: string;
+};
+
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+async function fetchOsmContext(query: string) {
+  let lastStatus = "unavailable";
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) {
+        lastStatus = `${response.status}`;
+        continue;
+      }
+      const payload = (await response.json()) as { elements?: OsmElement[] };
+      if (Array.isArray(payload.elements)) return payload;
+      lastStatus = "invalid response";
+    } catch (error) {
+      lastStatus = error instanceof Error ? error.message : "request failed";
+    }
+  }
+  throw Error(`OpenStreetMap context ${lastStatus}`);
+}
+
+export async function classifyBoundarySurface(
+  boundary: Point[],
+  origin: [number, number],
+): Promise<SurfaceCheck> {
+  const geo = boundary.map((point) => toGeo(point, origin)),
+    centre = [
+      geo.reduce((sum, point) => sum + point[0], 0) / geo.length,
+      geo.reduce((sum, point) => sum + point[1], 0) / geo.length,
+    ] as Point;
+  try {
+    const response = await fetch(
+      `https://is-on-water.balbona.me/api/v1/get/${centre[1]}/${centre[0]}`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (response.ok) {
+      const result = (await response.json()) as {
+        isWater?: boolean;
+        feature?: string;
+      };
+      if (typeof result.isWater === "boolean")
+        return {
+          surface: result.isWater ? "water" : "land",
+          name: result.feature,
+        };
+    }
+  } catch {
+    // Fall back to OpenStreetMap reverse lookup below.
+  }
+
+  try {
+    const reverseUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+    reverseUrl.searchParams.set("lat", String(centre[1]));
+    reverseUrl.searchParams.set("lon", String(centre[0]));
+    reverseUrl.searchParams.set("format", "jsonv2");
+    reverseUrl.searchParams.set("zoom", "18");
+    const response = await fetch(reverseUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return { surface: "unknown" };
+    const place = (await response.json()) as {
+      category?: string;
+      type?: string;
+      display_name?: string;
+      address?: Record<string, string>;
+    };
+    const waterTypes = new Set([
+      "water",
+      "sea",
+      "ocean",
+      "bay",
+      "strait",
+      "lake",
+      "reservoir",
+      "river",
+    ]);
+    const isWater =
+      place.category === "water" ||
+      (place.category === "natural" && waterTypes.has(place.type ?? "")) ||
+      waterTypes.has(place.type ?? "");
+    return {
+      surface: isWater
+        ? "water"
+        : place.address || place.display_name
+          ? "land"
+          : "unknown",
+      name: place.display_name,
+    };
+  } catch {
+    return { surface: "unknown" };
+  }
+}
 
 const pointSegmentDistance = (p: Point, a: Point, b: Point) => {
   const dx = b[0] - a[0],
@@ -137,6 +250,7 @@ export async function analyzeSite(
       intersectingBuildings: 0,
       intersectingWaterFeatures: 0,
       intersectingLandUse: [],
+      surface: "unknown",
       buildability: "unknown",
       checkedAt: new Date().toISOString(),
       notes: ["A ground and elevation survey is required before engineering."],
@@ -148,14 +262,17 @@ export async function analyzeSite(
     pad = 0.002,
     bbox = `${Math.min(...lats) - pad},${Math.min(...lons) - pad},${Math.max(...lats) + pad},${Math.max(...lons) + pad}`,
     query = `[out:json][timeout:18];(way["highway"](${bbox});way["building"](${bbox});way["waterway"](${bbox});way["natural"="water"](${bbox});way["landuse"](${bbox}););out tags center geom;`;
+  const surfaceCheck = await classifyBoundarySurface(boundary, origin);
+  base.surface = surfaceCheck.surface;
+  base.surfaceName = surfaceCheck.name;
+  if (surfaceCheck.surface === "water") {
+    base.buildability = "blocked";
+    base.notes.unshift(
+      "The centre of this boundary is mapped as water. Buildings cannot be placed until the boundary is moved onto suitable land.",
+    );
+  }
   try {
-    const response = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `data=${encodeURIComponent(query)}`,
-    });
-    if (!response.ok) throw Error(`OpenStreetMap returned ${response.status}`);
-    const payload = (await response.json()) as { elements?: OsmElement[] };
+    const payload = await fetchOsmContext(query);
     const elements = payload.elements ?? [],
       localGeometry = (element: OsmElement) =>
         (element.geometry ?? []).map(({ lon, lat }) =>
@@ -240,7 +357,10 @@ export async function analyzeSite(
       base.notes.unshift(
         `${base.existingBuildings} mapped existing building(s) need site verification before layout work.`,
       );
-    base.buildability = base.intersectingWaterFeatures ? "blocked" : "review";
+    base.buildability =
+      base.surface === "water" || base.intersectingWaterFeatures
+        ? "blocked"
+        : "review";
     base.sourceAvailable = true;
   } catch {
     base.notes.unshift(

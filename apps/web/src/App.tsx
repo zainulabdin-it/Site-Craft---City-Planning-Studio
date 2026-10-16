@@ -36,6 +36,9 @@ import {
   Hand,
   Upload,
   Landmark,
+  TriangleAlert,
+  ScanLine,
+  Network,
 } from "lucide-react";
 import {
   newProject,
@@ -48,16 +51,24 @@ import {
   type DesignObject,
   type DataLayer,
   type ProjectLayer,
+  type Zone,
+  type ScenarioSnapshot,
+  type UtilityNetwork,
 } from "./model";
 import {
   validateProject,
   connectRoad,
   length,
   area,
+  formatAreaNZ,
   distance,
   footprint,
+  projectToSegment,
   moveTo,
   resizeFromHandle,
+  toGeo,
+  toLocal,
+  validateObjectCollisions,
 } from "./geometry";
 import { command, applyCommand, type Command } from "./history";
 import {
@@ -68,14 +79,18 @@ import {
   loadServer,
   download,
   saveToComputer,
+  saveSnapshot,
 } from "./persistence";
-import { Viewport, type ViewAction } from "./Viewport";
+import { Viewport, type TerrainAnalysis, type ViewAction } from "./Viewport";
 import { searchLocations, type LocationResult } from "./geocoding";
 import { importGeoJSON } from "./geojson";
 import { zarajNzProject } from "./zarajDemo";
+import { cinematicSocietyProject } from "./cinematicDemo";
 import {
   importCustomAsset,
   listCustomAssets,
+  restoreCustomAssets,
+  type EmbeddedCustomAsset,
   type CustomAsset,
   type CustomAssetCategory,
 } from "./assetStorage";
@@ -84,9 +99,31 @@ import {
   societyAssetCategories,
   type SocietyAssetCategory,
 } from "./societyAssets";
-import { analyzeSite, type SiteAnalysis } from "./siteAnalysis";
+import {
+  analyzeSite,
+  classifyBoundarySurface,
+  type SiteAnalysis,
+} from "./siteAnalysis";
+import { friendlyError } from "./errors";
+import { analyzePlanning } from "./planningAnalysis";
+import { openPlanningReport } from "./planningReport";
 
 type ShapeChoice = { value: string; label: string; preview: string };
+const zoneAllowedUses = (
+  type: Zone["type"],
+): DesignObject["buildingType"][] => {
+  if (type === "residential")
+    return ["Detached house", "Townhouse", "Apartment"];
+  if (type === "commercial") return ["Commercial"];
+  if (type === "mixed-use")
+    return ["Detached house", "Townhouse", "Apartment", "Commercial"];
+  if (type === "education") return ["School"];
+  if (type === "health") return ["Clinic"];
+  if (type === "faith") return ["Place of worship"];
+  if (type === "recreation" || type === "cemetery" || type === "protected")
+    return [];
+  return ["Community"];
+};
 const quickLocations: Array<{
   id: string;
   name: string;
@@ -193,7 +230,7 @@ function initial() {
   }
 }
 const icons = {
-  boundary: Pentagon,
+  boundary: ScanLine,
   road: Route,
   building: Building2,
   plot: Pentagon,
@@ -225,7 +262,9 @@ export default function App() {
       boot.project.designLayers.map((layer) => layer.kind),
     ),
     [engine, setEngine] = useState("Cesium 3D"),
-    [viewMode, setViewMode] = useState<"2d" | "3d" | "street">("2d"),
+    [viewMode, setViewMode] = useState<"2d" | "3d" | "street" | "cinematic">(
+      "2d",
+    ),
     [navigationProfile, setNavigationProfile] = useState<
       "walk" | "orbit" | "drone"
     >("orbit"),
@@ -242,16 +281,31 @@ export default function App() {
     [objectKindFilter, setObjectKindFilter] = useState<Kind | "all">("all"),
     [leftOpen, setLeftOpen] = useState(true),
     [rightOpen, setRightOpen] = useState(false),
+    [rightPanelTab, setRightPanelTab] = useState<
+      "inspector" | "assets" | "utilities" | "warnings"
+    >("inspector"),
     [toolsOpen, setToolsOpen] = useState(true),
     [status, setStatus] = useState(boot.status),
     [error, setError] = useState(boot.error),
     [context, setContext] = useState("Loading map…"),
+    [cursorGeo, setCursorGeo] = useState<Point | null>(null),
+    [cameraInfo, setCameraInfo] = useState<{
+      height: number;
+      bearing: number;
+      pitch: number;
+    } | null>(null),
+    [utilityRoadId, setUtilityRoadId] = useState(""),
+    [terrainAnalysis, setTerrainAnalysis] = useState<TerrainAnalysis>({
+      available: false,
+    }),
     [undo, setUndo] = useState<Command[]>([]),
     [redo, setRedo] = useState<Command[]>([]),
     [action, setAction] = useState<ViewAction>({ type: "frame", seq: 0 }),
     [activeMenu, setActiveMenu] = useState<"project" | "edit" | "view" | null>(
       null,
     ),
+    [savedWorkOpen, setSavedWorkOpen] = useState(false),
+    [savedWorkLoading, setSavedWorkLoading] = useState(false),
     [placementDialog, setPlacementDialog] = useState<{
       object: DesignObject;
       command: string;
@@ -302,6 +356,196 @@ export default function App() {
     projectFile = useRef<HTMLInputElement>(null),
     version = useRef(0);
   const current = project.objects.find((o) => o.id === selected);
+  const planning = useMemo(
+    () => analyzePlanning(project, terrainAnalysis),
+    [project, terrainAnalysis],
+  );
+  const activeWarnings = planning.issues.filter(
+    (issue) => issue.severity !== "pass",
+  );
+  const utilityRoads = project.objects.filter(
+    (object) => object.kind === "road",
+  );
+  const utilityRoad =
+    current?.kind === "road"
+      ? current
+      : (utilityRoads.find((road) => road.id === utilityRoadId) ??
+        utilityRoads[0]);
+  const panelSections = [
+    ["inspector", "Inspector", Focus],
+    ["assets", "Assets", Box],
+    ["utilities", "Utilities", Network],
+    ["warnings", "Warnings", TriangleAlert],
+  ] as const;
+  const currentZone = current
+    ? project.zones.find((zone) => zone.parcelIds.includes(current.id))
+    : undefined;
+  const updateZone = (zoneId: string, values: Partial<Zone>) => {
+    setProject((currentProject) => ({
+      ...currentProject,
+      zones: currentProject.zones.map((zone) =>
+        zone.id === zoneId ? { ...zone, ...values } : zone,
+      ),
+    }));
+    version.current++;
+    setStatus("Unsaved");
+  };
+  const createZoneForParcel = (parcel: DesignObject) => {
+    const zone: Zone = {
+      id: crypto.randomUUID(),
+      name: parcel.name + " residential zone",
+      type: "residential",
+      parcelIds: [parcel.id],
+      allowedBuildingTypes: ["Detached house", "Townhouse", "Apartment"],
+      frontSetbackM: 3,
+      sideSetbackM: 1.5,
+      rearSetbackM: 3,
+      maximumFloors: 3,
+      maximumCoveragePercent: 45,
+      maximumFar: 1.2,
+      minimumPlotAreaM2: 100,
+    };
+    setProject((currentProject) => ({
+      ...currentProject,
+      zones: [...currentProject.zones, zone],
+    }));
+    version.current++;
+    setStatus("Unsaved");
+  };
+  const saveUtilityNetworks = (networks: UtilityNetwork[]) => {
+    setProject((currentProject) => ({
+      ...currentProject,
+      utilityNetworks: networks,
+    }));
+    version.current++;
+    setStatus("Unsaved");
+  };
+  const addUtilityCorridor = (
+    road: DesignObject,
+    type: UtilityNetwork["type"],
+  ) => {
+    const connectionDistanceM = 30;
+    const connectedObjectIds = project.objects
+      .filter((object) => object.kind === "building")
+      .filter((object) =>
+        object.points.some((point) =>
+          road.points
+            .slice(1)
+            .some(
+              (end, index) =>
+                projectToSegment(point, road.points[index], end).d <=
+                connectionDistanceM,
+            ),
+        ),
+      )
+      .map((object) => object.id);
+    const units: Record<UtilityNetwork["type"], string> = {
+      water: "L/s",
+      wastewater: "L/s",
+      stormwater: "m³",
+      electricity: "kVA",
+      telecom: "connections",
+    };
+    saveUtilityNetworks([
+      ...project.utilityNetworks,
+      {
+        id: crypto.randomUUID(),
+        name: `${road.name} ${type}`,
+        type,
+        sourceRoadId: road.id,
+        points: road.points.map((point) => [...point] as Point),
+        capacity: 0,
+        capacityUnit: units[type],
+        connectionDistanceM,
+        connectedObjectIds,
+        source: "Concept corridor drawn from road alignment",
+        confidence: "indicative",
+      },
+    ]);
+  };
+  const updateUtilityNetwork = (
+    networkId: string,
+    values: Partial<UtilityNetwork>,
+  ) =>
+    saveUtilityNetworks(
+      project.utilityNetworks.map((network) =>
+        network.id === networkId ? { ...network, ...values } : network,
+      ),
+    );
+  const scenarioComparisons = useMemo(
+    () =>
+      project.alternatives.map((scenario) => ({
+        scenario,
+        analysis: analyzePlanning(
+          {
+            ...project,
+            scenarioId: scenario.id,
+            scenarioName: scenario.name,
+            objects: scenario.objects,
+            alternatives: [],
+          },
+          terrainAnalysis,
+        ),
+      })),
+    [project, terrainAnalysis],
+  );
+  const cloneScenario = () => {
+    const id = crypto.randomUUID(),
+      snapshot: ScenarioSnapshot = {
+        id,
+        name: "Alternative " + (project.alternatives.length + 1),
+        createdAt: new Date().toISOString(),
+        objects: project.objects.map((object) => ({
+          ...object,
+          scenarioId: id,
+          points: object.points.map((point) => [...point] as Point),
+          nodeIds: [...object.nodeIds],
+        })),
+      };
+    setProject((currentProject) => ({
+      ...currentProject,
+      alternatives: [...currentProject.alternatives, snapshot],
+    }));
+    version.current++;
+    setStatus("Unsaved");
+  };
+  const loadScenario = (scenario: ScenarioSnapshot) => {
+    const currentSnapshot: ScenarioSnapshot = {
+      id: project.scenarioId,
+      name: project.scenarioName,
+      createdAt: new Date().toISOString(),
+      objects: project.objects,
+    };
+    setProject({
+      ...project,
+      scenarioId: scenario.id,
+      scenarioName: scenario.name,
+      objects: scenario.objects,
+      alternatives: [
+        ...project.alternatives.filter((item) => item.id !== scenario.id),
+        currentSnapshot,
+      ].slice(-10),
+    });
+    setSelected("");
+    setUndo([]);
+    setRedo([]);
+    version.current++;
+    setStatus("Unsaved");
+    window.setTimeout(() => frame(), 50);
+  };
+  const updatePlanningSettings = (
+    values: Partial<Project["planningSettings"]>,
+  ) => {
+    setProject((currentProject) => ({
+      ...currentProject,
+      planningSettings: {
+        ...currentProject.planningSettings,
+        ...values,
+      },
+    }));
+    version.current++;
+    setStatus("Unsaved");
+  };
   const updatePlacementObject = (changes: Partial<DesignObject>) =>
     setPlacementDialog((dialog) =>
       dialog ? { ...dialog, object: { ...dialog.object, ...changes } } : dialog,
@@ -309,7 +553,9 @@ export default function App() {
   const refreshAssets = () =>
     listCustomAssets()
       .then(setCustomAssets)
-      .catch((e) => setError(`Asset library could not open: ${String(e)}`));
+      .catch((e) =>
+        setError(`Asset library could not open: ${friendlyError(e)}`),
+      );
   useEffect(() => {
     refreshAssets();
     window.addEventListener("sitecraft-assets-changed", refreshAssets);
@@ -328,6 +574,18 @@ export default function App() {
     const timeout = window.setTimeout(() => setError(""), 2000);
     return () => window.clearTimeout(timeout);
   }, [error]);
+  useEffect(() => {
+    if (status !== "Unsaved" || storage !== "local") return;
+    const timeout = window.setTimeout(() => {
+      try {
+        saveSnapshot(project);
+        setStatus("Autosaved");
+      } catch (error) {
+        setError("Autosave failed: " + friendlyError(error));
+      }
+    }, 2500);
+    return () => window.clearTimeout(timeout);
+  }, [project, status, storage]);
   const edit = (
     updates: DesignObject[],
     remove: string[] = [],
@@ -336,6 +594,18 @@ export default function App() {
     try {
       const c = command(project, label, updates, remove);
       const p = applyCommand(project, c);
+      validateObjectCollisions(p, new Set(updates.map((object) => object.id)));
+      const changedIds = new Set(updates.map((object) => object.id)),
+        blockedHazard = analyzePlanning(p, terrainAnalysis).issues.find(
+          (issue) =>
+            issue.severity === "error" &&
+            issue.id.startsWith("hazards:overlap:") &&
+            issue.objectIds.some((id) => changedIds.has(id)),
+        );
+      if (blockedHazard)
+        throw Error(
+          `${blockedHazard.title}. Move the object outside this avoid area or change the hazard response only after professional review.`,
+        );
       setProject(p);
       version.current++;
       setUndo([...undo, c].slice(-100));
@@ -344,14 +614,67 @@ export default function App() {
       setError("");
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
       return false;
     }
+  };
+  const duplicateSelected = () => {
+    if (!current) return;
+    const copy = {
+      ...current,
+      id: crypto.randomUUID(),
+      name: `${current.name.slice(0, 95)} copy`,
+      nodeIds: current.nodeIds.map(() => crypto.randomUUID()),
+    };
+    const step = Math.max(
+      20,
+      current.width * current.scale + 4,
+      current.depth * current.scale + 4,
+    );
+    for (const ring of [1, 2, 3]) {
+      for (const [x, y] of [
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+        [0, -1],
+        [1, 1],
+        [-1, 1],
+        [-1, -1],
+        [1, -1],
+      ]) {
+        const candidate: DesignObject = {
+          ...copy,
+          points: current.points.map(
+            ([east, north]) =>
+              [east + x * step * ring, north + y * step * ring] as Point,
+          ),
+        };
+        try {
+          const next = applyCommand(
+            project,
+            command(project, "Duplicate object", [candidate], []),
+          );
+          validateObjectCollisions(next, new Set([candidate.id]));
+        } catch {
+          continue;
+        }
+        if (edit([candidate], [], "Duplicate object")) {
+          setSelected(candidate.id);
+          setTool("move");
+          setDraft([]);
+        }
+        return;
+      }
+    }
+    setError(
+      "No clear space nearby for a copy. Make room inside the site, then try again.",
+    );
   };
   const frame = (id?: string, type: ViewAction["type"] = "frame") => {
     if (type === "top") setViewMode("2d");
     else if (type === "perspective" || type === "drone") setViewMode("3d");
     else if (type === "street") setViewMode("street");
+    else if (type.startsWith("cinematic-")) setViewMode("cinematic");
     setAction({ id, type, seq: Date.now() });
   };
   const persistDesignLayers = (
@@ -393,7 +716,7 @@ export default function App() {
       setStatus("Unsaved");
       setError("");
     } catch (e) {
-      setError(String(e));
+      setError(friendlyError(e));
     }
   };
   useEffect(() => {
@@ -415,26 +738,6 @@ export default function App() {
         e.preventDefault();
         setName("New Christchurch site");
         setDialog("new");
-      }
-      if (tool === "hand" && viewMode !== "2d") {
-        const key = e.key.toLowerCase();
-        const navigationKeys: Partial<Record<string, ViewAction["type"]>> = {
-          w: "move-forward",
-          s: "move-backward",
-          a: "strafe-left",
-          d: "strafe-right",
-          q: navigationProfile === "drone" ? "move-down" : "rotate-left",
-          e: navigationProfile === "drone" ? "move-up" : "rotate-right",
-          arrowleft: "rotate-left",
-          arrowright: "rotate-right",
-          arrowup: "tilt-up",
-          arrowdown: "tilt-down",
-        };
-        const type = navigationKeys[key];
-        if (type) {
-          e.preventDefault();
-          setAction({ type, seq: Date.now() });
-        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -468,10 +771,55 @@ export default function App() {
       );
     }
   };
-  const finish = () => {
+  const finish = async (endPoint?: Point) => {
     if (!["boundary", "road", "plot", "freehand"].includes(tool)) return;
+    const points =
+      endPoint &&
+      (!draft.length || distance(draft[draft.length - 1], endPoint) >= 0.1)
+        ? [...draft, endPoint]
+        : draft;
+    const minimumPoints = tool === "road" ? 2 : 3;
+    if (points.length < minimumPoints) {
+      setError(
+        tool === "road"
+          ? "Add at least 2 points to finish this road."
+          : "Add at least 3 points to finish this shape.",
+      );
+      return;
+    }
+    if (tool === "boundary") {
+      setError("Checking whether this site is on suitable land…");
+      const surface = await classifyBoundarySurface(points, project.origin);
+      if (surface.surface === "water") {
+        setError(
+          "This boundary is on water and cannot be saved. Move it onto suitable land and try again.",
+        );
+        return;
+      }
+      setError("");
+    }
+    const isFirstBoundary =
+      tool === "boundary" &&
+      !project.objects.some((object) => object.kind === "boundary");
+    let drawingProject = project;
+    let objectPoints = points;
+    if (isFirstBoundary) {
+      const centre: Point = [
+        points.reduce((sum, point) => sum + point[0], 0) / points.length,
+        points.reduce((sum, point) => sum + point[1], 0) / points.length,
+      ];
+      const nextOrigin = toGeo(centre, project.origin);
+      objectPoints = points.map((point) =>
+        toLocal(toGeo(point, project.origin), nextOrigin),
+      );
+      drawingProject = { ...project, origin: nextOrigin };
+      setProject(drawingProject);
+      setDraft(objectPoints);
+      version.current++;
+      setStatus("Unsaved");
+    }
     const objectKind = tool === "freehand" ? "plot" : tool;
-    const o = newObject(project, objectKind as Kind, draft);
+    const o = newObject(drawingProject, objectKind as Kind, objectPoints);
     if (tool === "freehand") o.name = "Free style shape";
     if (tool === "boundary") {
       const siteNumber =
@@ -481,6 +829,12 @@ export default function App() {
     }
     setPlacementDialog({ object: o, command: `Draw ${tool}` });
     setDraftPointer(null);
+  };
+  const activateMoveTool = () => {
+    setTool("move");
+    setDraft([]);
+    setDraftPointer(null);
+    setPlacementAsset(null);
   };
   const click = (p: Point, id?: string) => {
     if (tool === "hand") return;
@@ -657,7 +1011,7 @@ export default function App() {
       return true;
     } catch (e) {
       setStatus("Save failed");
-      setError(String(e));
+      setError(friendlyError(e));
       return false;
     }
   };
@@ -775,7 +1129,27 @@ export default function App() {
       setProjects(storage === "server" ? await loadServer() : listLocal());
       setDialog("open");
     } catch (e) {
-      setError(String(e));
+      setError(friendlyError(e));
+    }
+  };
+  useEffect(() => {
+    setSavedWorkOpen(false);
+  }, [activeMenu]);
+  const toggleSavedWork = async () => {
+    if (savedWorkOpen) {
+      setSavedWorkOpen(false);
+      return;
+    }
+    setSavedWorkOpen(true);
+    setSavedWorkLoading(true);
+    try {
+      const saved = storage === "server" ? await loadServer() : listLocal();
+      setProjects([...saved].reverse());
+    } catch (error) {
+      setProjects([]);
+      setError(`Saved work could not load: ${friendlyError(error)}`);
+    } finally {
+      setSavedWorkLoading(false);
     }
   };
   const searchMap = async (e: React.FormEvent) => {
@@ -787,7 +1161,7 @@ export default function App() {
       setError(results.length ? "" : "No matching locations found.");
     } catch (e) {
       setLocationResults([]);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     } finally {
       setSearching(false);
     }
@@ -854,7 +1228,7 @@ export default function App() {
         setError("");
       } else requestProjectSwitch(validateProject(parsed), true, true);
     } catch (err) {
-      setError(String(err));
+      setError(friendlyError(err));
     }
     e.target.value = "";
   };
@@ -864,16 +1238,28 @@ export default function App() {
     try {
       const selectedFile = e.target.files?.[0];
       if (!selectedFile) return;
-      if (selectedFile.size > 5_000_000)
-        throw Error("Project file exceeds 5 MB.");
+      if (selectedFile.size > 150_000_000)
+        throw Error("Project package exceeds 150 MB.");
       const parsed = JSON.parse(await selectedFile.text());
       if (parsed?.type === "FeatureCollection" || parsed?.type === "Feature")
         throw Error(
           "This is a GeoJSON layer. Use Import GeoJSON inside the Layers panel.",
         );
-      requestProjectSwitch(validateProject(parsed), true, true, "computer");
+      const packaged = parsed?.format === "sitecraft-package";
+      if (packaged) {
+        if (parsed.version !== 1 || !Array.isArray(parsed.assets))
+          throw Error("This Sitecraft package version is not supported.");
+        await restoreCustomAssets(parsed.assets as EmbeddedCustomAsset[]);
+        setCustomAssets(await listCustomAssets());
+      }
+      requestProjectSwitch(
+        validateProject(packaged ? parsed.project : parsed),
+        true,
+        true,
+        "computer",
+      );
     } catch (err) {
-      setError(String(err));
+      setError(friendlyError(err));
     }
     e.target.value = "";
   };
@@ -911,7 +1297,7 @@ export default function App() {
   );
   const internalLocations = useMemo(() => {
     const destinationName =
-        /mosque|church|temple|gurdwara|school|nursery|hospital|clinic|pharmacy|community (club|centre|center)|library|graveyard|cemetery|police|fire station|playground|sports field|main park|commercial (area|centre|center)|neighbourhood market|supermarket/i,
+        /mosque|church|temple|gurdwara|school|nursery|hospital|clinic|pharmacy|community (club|centre|center)|library|graveyard|cemetery|police|fire station|playground|sports field|main park|commercial (area|centre|center)|neighbourhood market|supermarket|f3 technologies|avalon plaza/i,
       mainRoadName =
         /main boulevard|main avenue|park avenue|entrance road|access road|society gate/i,
       seen = new Set<string>();
@@ -951,6 +1337,23 @@ export default function App() {
             </button>
             {activeMenu === "project" && (
               <div className="top-menu-popover">
+                <label className="field compact-save-field">
+                  <span>Save destination</span>
+                  <select
+                    aria-label="Save destination"
+                    value={storage}
+                    onChange={(e) =>
+                      setStorage(
+                        e.target.value as "local" | "server" | "computer",
+                      )
+                    }
+                  >
+                    <option value="local">This browser</option>
+                    <option value="server">Local API server</option>
+                    <option value="computer">Computer file</option>
+                  </select>
+                </label>
+                <i />
                 <button
                   onClick={() => {
                     setName("New Christchurch site");
@@ -960,14 +1363,90 @@ export default function App() {
                 >
                   New project <kbd>Ctrl+N</kbd>
                 </button>
-                <button
-                  onClick={() => {
-                    void open();
-                    setActiveMenu(null);
-                  }}
-                >
-                  Open saved
-                </button>
+                <div className="saved-work-menu">
+                  <button
+                    aria-expanded={savedWorkOpen}
+                    aria-controls="saved-work-submenu"
+                    onClick={() => void toggleSavedWork()}
+                  >
+                    Saved work <ChevronRight size={15} />
+                  </button>
+                  {savedWorkOpen && (
+                    <div
+                      id="saved-work-submenu"
+                      className="saved-work-submenu"
+                      aria-label="Saved work"
+                    >
+                      <div className="saved-work-heading">
+                        Recent saved projects{" "}
+                        <small>
+                          {storage === "server"
+                            ? "Local API server"
+                            : "This browser"}
+                        </small>
+                      </div>
+                      <div className="saved-work-list">
+                        {savedWorkLoading ? (
+                          <p>Loading saved work…</p>
+                        ) : projects.length === 0 ? (
+                          <p>No saved projects yet.</p>
+                        ) : (
+                          projects.slice(0, 8).map((savedProject) => (
+                            <button
+                              key={savedProject.id}
+                              title={savedProject.name}
+                              onClick={() => {
+                                requestProjectSwitch(
+                                  savedProject,
+                                  true,
+                                  false,
+                                  storage === "server" ? "server" : "local",
+                                );
+                                setActiveMenu(null);
+                              }}
+                            >
+                              <span>{savedProject.name}</span>
+                              <small>
+                                {savedProject.objects.length} objects
+                              </small>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                      <button
+                        disabled={savedWorkLoading}
+                        onClick={() => {
+                          setDialog("open");
+                          setActiveMenu(null);
+                        }}
+                      >
+                        View all saved work
+                        {!savedWorkLoading && ` (${projects.length})`}
+                      </button>
+                      <i />
+                      <div className="saved-work-heading">Demo projects</div>
+                      <button
+                        onClick={() => {
+                          requestProjectSwitch(zarajNzProject(), false);
+                          setActiveMenu(null);
+                        }}
+                      >
+                        Avalon Heights
+                      </button>
+                      <button
+                        onClick={() => {
+                          requestProjectSwitch(
+                            cinematicSocietyProject(),
+                            false,
+                          );
+                          setActiveMenu(null);
+                        }}
+                      >
+                        Cinematic demo
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     projectFile.current?.click();
@@ -992,6 +1471,23 @@ export default function App() {
                   }}
                 >
                   Save to computer
+                </button>
+                <i />
+                <button
+                  onClick={() => {
+                    download(project, true);
+                    setActiveMenu(null);
+                  }}
+                >
+                  Export GeoJSON
+                </button>
+                <button
+                  onClick={() => {
+                    file.current?.click();
+                    setActiveMenu(null);
+                  }}
+                >
+                  Import GeoJSON layer
                 </button>
               </div>
             )}
@@ -1078,6 +1574,14 @@ export default function App() {
                   )}
                 >
                   Street view
+                </button>
+                <button
+                  onClick={() => (
+                    frame(undefined, "cinematic-entrance"),
+                    setActiveMenu(null)
+                  )}
+                >
+                  Cinematic showcase
                 </button>
                 <i />
                 <button onClick={() => (frame(), setActiveMenu(null))}>
@@ -1250,8 +1754,7 @@ export default function App() {
               </div>
               <div className="workspace-intro">
                 <div>
-                  <h2>Your next place.</h2>
-                  <p className="muted">Plan in a real-world context.</p>
+                  <h2 title={project.name}>{project.name}</h2>
                 </div>
               </div>
               <div className="project-buttons">
@@ -1274,51 +1777,12 @@ export default function App() {
                   Open file
                 </button>
                 <button
-                  onClick={() => requestProjectSwitch(zarajNzProject(), false)}
-                  title="Open the Zaraj-inspired New Zealand society demo"
-                >
-                  Zaraj demo
-                </button>
-              </div>
-              <label className="field compact-save-field">
-                <span>Save to</span>
-                <select
-                  value={storage}
-                  onChange={(e) =>
-                    setStorage(
-                      e.target.value as "local" | "server" | "computer",
-                    )
-                  }
-                >
-                  <option value="local">This browser</option>
-                  <option value="server">Local API server</option>
-                  <option value="computer">Computer file</option>
-                </select>
-              </label>
-              <div className="project-context-row">
-                <button
+                  aria-label="Frame project"
+                  title="Frame project"
                   onClick={() => frame()}
-                  className="compact-frame-button"
                 >
-                  <Focus size={14} /> <span>Frame project</span>
+                  <Focus size={16} />
                 </button>
-                <div
-                  className="compact-location"
-                  title={`${project.origin[1].toFixed(4)}°, ${project.origin[0].toFixed(4)}°`}
-                >
-                  <MapPin size={15} />
-                  <div>
-                    <b>
-                      {project.name.includes("Zaraj")
-                        ? "Rolleston fringe, NZ"
-                        : "Christchurch, NZ"}
-                    </b>
-                    <small>
-                      {Math.abs(project.origin[1]).toFixed(4)}° S ·{" "}
-                      {project.origin[0].toFixed(4)}° E
-                    </small>
-                  </div>
-                </div>
               </div>
             </div>
             <button
@@ -1740,6 +2204,94 @@ export default function App() {
                           />
                           <span>{Math.round(layer.opacity * 100)}%</span>
                         </label>
+                        <div className="hazard-layer-controls">
+                          <label className="field">
+                            Planning role
+                            <select
+                              value={layer.hazardType || "context"}
+                              onChange={(event) =>
+                                updateDataLayer(layer.id, {
+                                  hazardType:
+                                    event.target.value === "context"
+                                      ? undefined
+                                      : (event.target
+                                          .value as DataLayer["hazardType"]),
+                                  hazardSeverity:
+                                    event.target.value === "context"
+                                      ? undefined
+                                      : layer.hazardSeverity || "review",
+                                  confidence:
+                                    event.target.value === "context"
+                                      ? undefined
+                                      : layer.confidence || "unknown",
+                                })
+                              }
+                            >
+                              <option value="context">Context only</option>
+                              <option value="flood">Flood hazard</option>
+                              <option value="liquefaction">
+                                Liquefaction hazard
+                              </option>
+                              <option value="coastal">Coastal hazard</option>
+                              <option value="fault">Fault hazard</option>
+                              <option value="contamination">
+                                Contamination hazard
+                              </option>
+                            </select>
+                          </label>
+                          {layer.hazardType && (
+                            <>
+                              <label className="field">
+                                Response
+                                <select
+                                  value={layer.hazardSeverity || "review"}
+                                  onChange={(event) =>
+                                    updateDataLayer(layer.id, {
+                                      hazardSeverity: event.target
+                                        .value as DataLayer["hazardSeverity"],
+                                    })
+                                  }
+                                >
+                                  <option value="information">
+                                    Information
+                                  </option>
+                                  <option value="review">Needs review</option>
+                                  <option value="avoid">Avoid building</option>
+                                </select>
+                              </label>
+                              <label className="field">
+                                Confidence
+                                <select
+                                  value={layer.confidence || "unknown"}
+                                  onChange={(event) =>
+                                    updateDataLayer(layer.id, {
+                                      confidence: event.target
+                                        .value as DataLayer["confidence"],
+                                    })
+                                  }
+                                >
+                                  <option value="authoritative">
+                                    Authoritative
+                                  </option>
+                                  <option value="indicative">Indicative</option>
+                                  <option value="unknown">Unknown</option>
+                                </select>
+                              </label>
+                              <label className="field">
+                                Source date
+                                <input
+                                  type="date"
+                                  value={layer.sourceDate || ""}
+                                  onChange={(event) =>
+                                    updateDataLayer(layer.id, {
+                                      sourceDate: event.target.value,
+                                    })
+                                  }
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1811,6 +2363,7 @@ export default function App() {
                           onClick={() => {
                             setSelected(o.id);
                             setTool("select");
+                            frame(o.id);
                           }}
                         >
                           <Icon size={14} />
@@ -1863,11 +2416,16 @@ export default function App() {
             draftPointer={draftPointer}
             drawingKind={tool}
             onPointer={setDraftPointer}
+            onCursor={setCursorGeo}
+            onCameraInfo={setCameraInfo}
             onClick={click}
+            onFinishDrawing={finish}
+            onActivateMove={activateMoveTool}
             onMove={moveObject}
             onResize={resizeObject}
             onError={setError}
             onContext={setContext}
+            onTerrainAnalysis={setTerrainAnalysis}
             action={action}
             navigationMode={tool === "hand"}
             navigationProfile={navigationProfile}
@@ -1944,6 +2502,16 @@ export default function App() {
               >
                 Street
               </button>
+              <button
+                className={viewMode === "cinematic" ? "active" : ""}
+                onClick={() => {
+                  setNavigationProfile("walk");
+                  setTool("hand");
+                  frame(undefined, "cinematic-entrance");
+                }}
+              >
+                Cinematic
+              </button>
             </div>
           </div>
           {toolsOpen ? (
@@ -1959,9 +2527,7 @@ export default function App() {
                 [
                   ["select", MousePointer2, "Select"],
                   ["hand", Hand, "Hand · explore 360°"],
-                  ["boundary", Pentagon, "Boundary"],
-                  ["road", Route, "Road"],
-                  ["building", Building2, "Building"],
+                  ["boundary", ScanLine, "Boundary"],
                   ["plot", Pentagon, "Plot"],
                   ["rectangle", Square, "Rectangle"],
                   ["circle", Circle, "Circle"],
@@ -2036,9 +2602,7 @@ export default function App() {
                 aria-label="Duplicate selected"
                 title="Duplicate selected"
                 disabled={!current}
-                onClick={() =>
-                  setError("Duplicate is available from the inspector.")
-                }
+                onClick={duplicateSelected}
               >
                 <Copy size={19} />
               </button>
@@ -2095,7 +2659,7 @@ export default function App() {
               <Minus size={16} />
             </button>
           </div>
-          {viewMode !== "2d" && (
+          {viewMode !== "2d" && viewMode !== "cinematic" && (
             <div
               className="street-controls"
               aria-label="3D navigation controls"
@@ -2237,10 +2801,61 @@ export default function App() {
               )}
               <small>
                 {navigationProfile === "walk"
-                  ? "2 m step · WASD / arrows"
+                  ? "WASD move · arrows look · Shift faster"
                   : navigationProfile === "drone"
                     ? "25 m step · WASD · Q/E height"
                     : "Drag to explore 360°"}
+              </small>
+            </div>
+          )}
+          {viewMode === "cinematic" && (
+            <div className="cinematic-controls" aria-label="Cinematic views">
+              <div>
+                <small>CINEMATIC SHOWCASE</small>
+                <b>Choose a guided camera angle</b>
+              </div>
+              <div className="cinematic-presets">
+                <button onClick={() => frame(undefined, "cinematic-entrance")}>
+                  Entrance
+                </button>
+                <button onClick={() => frame(undefined, "cinematic-boulevard")}>
+                  Walkthrough
+                </button>
+                <button onClick={() => frame(undefined, "cinematic-landmarks")}>
+                  Landmarks
+                </button>
+                <button onClick={() => frame(undefined, "cinematic-aerial")}>
+                  Aerial
+                </button>
+              </div>
+              <div className="cinematic-movement">
+                <button
+                  aria-label="Turn cinematic view left"
+                  onClick={() =>
+                    setAction({ type: "rotate-left", seq: Date.now() })
+                  }
+                >
+                  ↶
+                </button>
+                <button
+                  aria-label="Move cinematic view forward"
+                  onClick={() =>
+                    setAction({ type: "move-forward", seq: Date.now() })
+                  }
+                >
+                  ▲
+                </button>
+                <button
+                  aria-label="Turn cinematic view right"
+                  onClick={() =>
+                    setAction({ type: "rotate-right", seq: Date.now() })
+                  }
+                >
+                  ↷
+                </button>
+              </div>
+              <small>
+                Hold WASD to walk · arrows to look · Shift to move faster.
               </small>
             </div>
           )}
@@ -2271,12 +2886,12 @@ export default function App() {
                             draftPointer && draft.length
                               ? distance(draft.at(-1)!, draftPointer)
                               : 0;
-                          return `${segment.toFixed(1)} m current edge · ${squareMetres.toFixed(1)} m² · ${(squareMetres / 25.2929).toFixed(2)} marla`;
+                          return `${segment.toFixed(1)} m current edge · ${formatAreaNZ(squareMetres)}`;
                         })()}
                   </span>
                   <button
                     className="primary"
-                    onClick={finish}
+                    onClick={() => finish()}
                     disabled={draft.length < (tool === "road" ? 2 : 3)}
                   >
                     Finish drawing
@@ -2287,7 +2902,7 @@ export default function App() {
             </div>
           )}
           {error && (
-            <div role="alert" aria-live="assertive" className="error">
+            <div role="alert" aria-live="assertive" className="error-toast">
               <span>{error}</span>
               <button aria-label="Dismiss error" onClick={() => setError("")}>
                 <X size={16} />
@@ -2295,16 +2910,34 @@ export default function App() {
             </div>
           )}
           <div className="map-bottom">
-            <span>
-              Coords: {project.origin[0].toFixed(5)},{" "}
-              {project.origin[1].toFixed(5)}
+            <span
+              className="cursor-coordinates"
+              aria-label="Cursor coordinates"
+            >
+              {cursorGeo ? (
+                <>
+                  <b>Lon</b> {cursorGeo[0].toFixed(6)}° <b>Lat</b>{" "}
+                  {cursorGeo[1].toFixed(6)}°
+                </>
+              ) : (
+                "Move the pointer over the map for coordinates"
+              )}
             </span>
-            <span>Zoom: 2.46</span>
-            <span>Eye alt: 12,424 km</span>
-            <span>Bearing: 0.0°</span>
-            <span>Pitch: 0.0°</span>
-            <span className="map-context">{context}</span>
-            <span className="diagnostics">⚙ Diagnostics: 0</span>
+            {cameraInfo && (
+              <>
+                <span>
+                  Altitude:{" "}
+                  {cameraInfo.height >= 1000
+                    ? (cameraInfo.height / 1000).toFixed(2) + " km"
+                    : cameraInfo.height.toFixed(1) + " m"}
+                </span>
+                <span>Bearing: {cameraInfo.bearing.toFixed(1)}°</span>
+                <span>Pitch: {cameraInfo.pitch.toFixed(1)}°</span>
+              </>
+            )}
+            <span className="map-context" title={context}>
+              {context}
+            </span>
           </div>
         </main>
         {rightOpen ? (
@@ -2317,211 +2950,788 @@ export default function App() {
             >
               <PanelRightClose size={16} />
             </button>
-            <div className="eyebrow">
-              INSPECTOR <span>PROPOSAL</span>
-            </div>
-            {current ? (
-              <Properties
-                key={current.id}
-                object={current}
-                onUpdate={updateConnected}
-                onFrame={() => frame(current.id)}
-                onMove={() => {
-                  setTool("move");
-                  setDraft([]);
-                }}
-                onDelete={() => {
-                  if (edit([], [current.id], "Delete object")) setSelected("");
-                }}
-                onDuplicate={() => {
-                  const o = {
-                    ...current,
-                    id: crypto.randomUUID(),
-                    name: current.name + " copy",
-                    points: current.points.map(
-                      ([x, y]) => [x + 20, y + 20] as Point,
-                    ),
-                    nodeIds: current.nodeIds.map(() => crypto.randomUUID()),
-                  };
-                  if (edit([o], [], "Duplicate object")) setSelected(o.id);
-                }}
-              />
-            ) : (
-              <div className="empty-inspector">
-                <MousePointer2 size={30} />
-                <h3>Make room for ideas.</h3>
-                <p>
-                  Select an object to edit its dimensions, placement and
-                  appearance.
-                </p>
-              </div>
-            )}
-            <div className="section-title">
-              ASSET LIBRARY{" "}
-              <span>{societyAssets.length + 4 + customAssets.length}</span>
-            </div>
-            <p className="muted small">
-              Choose an object, then click the map to place it.
-            </p>
-            <label className="asset-search">
-              <Search size={14} />
-              <input
-                aria-label="Search assets"
-                placeholder="Search assets"
-                value={assetSearch}
-                onChange={(e) => setAssetSearch(e.target.value)}
-              />
-            </label>
-            <div className="asset-categories">
-              {[...societyAssetCategories, "My Assets"].map((category) => (
+            <div className="inspector-tabs" aria-label="Workspace panels">
+              {panelSections.map(([tab, label, Icon]) => (
                 <button
-                  key={category}
-                  className={assetCategoryFilter === category ? "active" : ""}
-                  onClick={() =>
-                    setAssetCategoryFilter(
-                      category as SocietyAssetCategory | "All" | "My Assets",
-                    )
-                  }
+                  key={tab}
+                  aria-pressed={rightPanelTab === tab}
+                  aria-controls={tab + "-content"}
+                  className={rightPanelTab === tab ? "active" : ""}
+                  onClick={() => setRightPanelTab(tab)}
                 >
-                  {category}
+                  <Icon size={16} /> {label}
+                  {tab === "warnings" && (
+                    <span className="warnings-count">
+                      {activeWarnings.length}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
-            <div className="assets">
-              {assetCategoryFilter === "All" &&
-                (["tree", "car", "bench", "bridge"] as Kind[]).map((k) => {
-                  const Icon = icons[k];
-                  return (
-                    <button
-                      key={k}
-                      className={tool === k && !placementAsset ? "active" : ""}
-                      onClick={() => {
-                        setPlacementAsset(null);
-                        setTool(k);
-                        setDraft([]);
-                      }}
-                    >
-                      <Icon size={24} />
-                      <span>{k[0].toUpperCase() + k.slice(1)}</span>
-                    </button>
-                  );
-                })}
-              {societyAssets
-                .filter(
-                  (asset) =>
-                    assetCategoryFilter !== "My Assets" &&
-                    (assetCategoryFilter === "All" ||
-                      asset.category === assetCategoryFilter) &&
-                    asset.name
-                      .toLowerCase()
-                      .includes(assetSearch.toLowerCase()),
-                )
-                .map((asset) => {
-                  const Icon =
-                    asset.category === "Faith" ? Landmark : Building2;
-                  return (
-                    <button
-                      key={asset.assetRef}
-                      className={
-                        placementAsset?.assetRef === asset.assetRef
-                          ? "active"
-                          : ""
-                      }
-                      onClick={() => {
-                        setPlacementAsset(asset);
-                        setTool(asset.kind);
-                        setDraft([]);
-                      }}
-                    >
-                      <Icon size={24} />
-                      <span>{asset.name}</span>
-                      <small>{asset.category}</small>
-                    </button>
-                  );
-                })}
-              {customAssets
-                .filter(
-                  (asset) =>
-                    (assetCategoryFilter === "All" ||
-                      assetCategoryFilter === "My Assets") &&
-                    asset.name
-                      .toLowerCase()
-                      .includes(assetSearch.toLowerCase()),
-                )
-                .map((asset) => (
+            {rightPanelTab === "warnings" ? (
+              <section
+                id="warnings-content"
+                className="warnings-panel"
+                aria-label="Project warnings and report"
+              >
+                <h2>Warnings &amp; report</h2>
+                <p className="muted small">
+                  Live checks for this project. Fixed issues disappear
+                  automatically. Select an object warning to inspect it.
+                </p>
+                <div className="warnings-report-action">
                   <button
-                    key={asset.id}
-                    className={
-                      placementAsset?.assetRef === `custom:${asset.id}`
-                        ? "active"
-                        : ""
-                    }
-                    title={`${asset.category} · ${(asset.size / 1024 / 1024).toFixed(1)} MB`}
                     onClick={() => {
-                      setPlacementAsset({
-                        assetRef: `custom:${asset.id}`,
-                        name: asset.name,
-                        kind: "building",
-                        buildingType:
-                          asset.category === "Faith"
-                            ? "Place of worship"
-                            : asset.category === "Education"
-                              ? "School"
-                              : asset.category === "Health"
-                                ? "Clinic"
-                                : "Commercial",
-                        width: asset.width,
-                        depth: asset.depth,
-                        height: asset.height,
-                        color: "#d8e2ea",
-                      });
-                      setTool("building");
-                      setDraft([]);
+                      try {
+                        openPlanningReport(project, planning, terrainAnalysis);
+                      } catch (error) {
+                        setError(friendlyError(error));
+                      }
                     }}
                   >
-                    <Box size={24} />
-                    <span>{asset.name}</span>
-                    <small>{asset.category}</small>
+                    <Download size={14} /> Planning report
                   </button>
-                ))}
-              <button
-                className="asset-import"
-                onClick={() => setAssetDialog(true)}
-              >
-                <Upload size={24} />
-                <span>Import GLB</span>
-              </button>
-            </div>
-            <div className="export">
-              <button
-                onClick={async () => {
-                  try {
-                    if (await saveToComputer(project)) {
-                      setStatus("Saved");
-                      setError("");
-                    }
-                  } catch (e) {
-                    setError(`Computer save failed: ${String(e)}`);
-                  }
-                }}
-              >
-                <Download size={14} /> Save to computer
-              </button>
-              <button onClick={() => download(project, true)}>GeoJSON</button>
-              <button onClick={() => file.current?.click()}>
-                <FolderOpen size={14} /> Open from computer
-              </button>
-            </div>
+                </div>
+                <section className="planning-dashboard">
+                  <div className="planning-dashboard-heading">
+                    <div>
+                      <small>LIVE CONCEPT CHECK</small>
+                      <b>{planning.score.toFixed(1)} / 10 suitability</b>
+                    </div>
+                    <span
+                      className={
+                        planning.issues.some(
+                          (issue) => issue.severity === "error",
+                        )
+                          ? "has-errors"
+                          : "review"
+                      }
+                    >
+                      {
+                        planning.issues.filter(
+                          (issue) => issue.severity !== "pass",
+                        ).length
+                      }{" "}
+                      checks
+                    </span>
+                  </div>
+                  <div className="planning-dashboard-metrics">
+                    <span>
+                      <b>{planning.estimatedResidents}</b> residents
+                    </span>
+                    <span>
+                      <b>{planning.coveragePercent.toFixed(1)}%</b> coverage
+                    </span>
+                    <span>
+                      <b>{planning.greenPercent.toFixed(1)}%</b> green
+                    </span>
+                    <span>
+                      <b>
+                        {planning.parkingProvided}/{planning.parkingRequired}
+                      </b>{" "}
+                      parking
+                    </span>
+                    <span>
+                      <b>{planning.utilityNetworks}</b> utility corridors
+                    </span>
+                    <span>
+                      <b>{planning.utilityConnections}</b> utility links
+                    </span>
+                    <span>
+                      <b>{planning.preliminaryRunoffM3.toFixed(0)} m³</b> runoff
+                      / 50 mm rain
+                    </span>
+                    <span>
+                      <b>
+                        {terrainAnalysis.available
+                          ? (terrainAnalysis.maximumSlopePercent ?? 0).toFixed(
+                              1,
+                            ) + "%"
+                          : "Unknown"}
+                      </b>{" "}
+                      max slope
+                    </span>
+                    <span>
+                      <b>
+                        {terrainAnalysis.available
+                          ? (terrainAnalysis.rangeM ?? 0).toFixed(1) + " m"
+                          : "Unknown"}
+                      </b>{" "}
+                      elevation range
+                    </span>
+                  </div>
+                  <div className="planning-issues">
+                    {activeWarnings.length === 0 && (
+                      <p className="warnings-empty">
+                        <Check size={18} /> No active warnings.
+                      </p>
+                    )}
+                    {activeWarnings.map((issue) => (
+                      <button
+                        key={issue.id}
+                        className={`planning-issue severity-${issue.severity}`}
+                        onClick={() => {
+                          const id = issue.objectIds[0];
+                          if (id) {
+                            setRightPanelTab("inspector");
+                            setSelected(id);
+                            frame(id);
+                          }
+                        }}
+                      >
+                        <span />
+                        <div>
+                          <small className="issue-severity">
+                            {issue.severity === "error"
+                              ? "Needs fixing"
+                              : issue.severity === "unknown"
+                                ? "Not checked"
+                                : "Review"}
+                          </small>
+                          <b>{issue.title}</b>
+                          <small>{issue.detail}</small>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="planning-disclaimer">
+                    Concept assumptions only. Unknown source data is never
+                    treated as safe.
+                  </p>
+                  <details className="planning-settings">
+                    <summary>Planning assumptions</summary>
+                    <label>
+                      Residents per home
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="0.5"
+                        value={project.planningSettings.residentsPerUnit}
+                        onChange={(event) =>
+                          updatePlanningSettings({
+                            residentsPerUnit: Number(event.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Parking per home
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        step="0.25"
+                        value={project.planningSettings.parkingSpacesPerUnit}
+                        onChange={(event) =>
+                          updatePlanningSettings({
+                            parkingSpacesPerUnit: Number(event.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Maximum coverage %
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={
+                          project.planningSettings.maximumSiteCoveragePercent
+                        }
+                        onChange={(event) =>
+                          updatePlanningSettings({
+                            maximumSiteCoveragePercent: Number(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Minimum green space %
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={
+                          project.planningSettings.minimumGreenSpacePercent
+                        }
+                        onChange={(event) =>
+                          updatePlanningSettings({
+                            minimumGreenSpacePercent: Number(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                      />
+                    </label>
+                  </details>
+                  <details className="scenario-comparison">
+                    <summary>
+                      Scenarios ({project.alternatives.length + 1})
+                    </summary>
+                    <div className="scenario-current">
+                      <b>{project.scenarioName}</b>
+                      <small>
+                        Current proposal · {planning.score.toFixed(1)}/10
+                      </small>
+                    </div>
+                    {scenarioComparisons.map(({ scenario, analysis }) => (
+                      <div className="scenario-row" key={scenario.id}>
+                        <div>
+                          <b>{scenario.name}</b>
+                          <small>
+                            {analysis.score.toFixed(1)}/10 ·{" "}
+                            {analysis.housingUnits - planning.housingUnits >= 0
+                              ? "+"
+                              : ""}
+                            {analysis.housingUnits - planning.housingUnits}{" "}
+                            homes ·{" "}
+                            {(
+                              analysis.greenPercent - planning.greenPercent
+                            ).toFixed(1)}
+                            % green delta
+                          </small>
+                        </div>
+                        <button onClick={() => loadScenario(scenario)}>
+                          Load
+                        </button>
+                      </div>
+                    ))}
+                    <button className="scenario-clone" onClick={cloneScenario}>
+                      <Copy size={13} /> Clone current proposal
+                    </button>
+                  </details>
+                </section>
+              </section>
+            ) : rightPanelTab === "assets" ? (
+              <section id="assets-content" aria-label="Asset library">
+                {" "}
+                <div className="section-title">
+                  ASSET LIBRARY{" "}
+                  <span>{societyAssets.length + 6 + customAssets.length}</span>
+                </div>
+                <p className="muted small">
+                  Choose an object, then click the map to place it.
+                </p>
+                <label className="asset-search">
+                  <Search size={14} />
+                  <input
+                    aria-label="Search assets"
+                    placeholder="Search assets"
+                    value={assetSearch}
+                    onChange={(e) => setAssetSearch(e.target.value)}
+                  />
+                </label>
+                <div className="asset-categories">
+                  {[...societyAssetCategories, "My Assets"].map((category) => (
+                    <button
+                      key={category}
+                      className={
+                        assetCategoryFilter === category ? "active" : ""
+                      }
+                      onClick={() =>
+                        setAssetCategoryFilter(
+                          category as
+                            SocietyAssetCategory | "All" | "My Assets",
+                        )
+                      }
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+                <div className="assets">
+                  {assetCategoryFilter === "All" &&
+                    (
+                      [
+                        "road",
+                        "building",
+                        "tree",
+                        "car",
+                        "bench",
+                        "bridge",
+                      ] as Kind[]
+                    )
+                      .filter((kind) =>
+                        kind.includes(assetSearch.toLowerCase()),
+                      )
+                      .map((k) => {
+                        const Icon = icons[k];
+                        return (
+                          <button
+                            key={k}
+                            className={
+                              tool === k && !placementAsset ? "active" : ""
+                            }
+                            onClick={() => {
+                              setPlacementAsset(null);
+                              setTool(k);
+                              setDraft([]);
+                            }}
+                          >
+                            <Icon size={24} />
+                            <span>{k[0].toUpperCase() + k.slice(1)}</span>
+                          </button>
+                        );
+                      })}
+                  {societyAssets
+                    .filter(
+                      (asset) =>
+                        assetCategoryFilter !== "My Assets" &&
+                        (assetCategoryFilter === "All" ||
+                          asset.category === assetCategoryFilter) &&
+                        asset.name
+                          .toLowerCase()
+                          .includes(assetSearch.toLowerCase()),
+                    )
+                    .map((asset) => {
+                      const Icon =
+                        asset.category === "Faith" ? Landmark : Building2;
+                      return (
+                        <button
+                          key={asset.assetRef}
+                          className={
+                            placementAsset?.assetRef === asset.assetRef
+                              ? "active"
+                              : ""
+                          }
+                          onClick={() => {
+                            setPlacementAsset(asset);
+                            setTool(asset.kind);
+                            setDraft([]);
+                          }}
+                        >
+                          <Icon size={24} />
+                          <span>{asset.name}</span>
+                          <small>{asset.category}</small>
+                        </button>
+                      );
+                    })}
+                  {customAssets
+                    .filter(
+                      (asset) =>
+                        (assetCategoryFilter === "All" ||
+                          assetCategoryFilter === "My Assets") &&
+                        asset.name
+                          .toLowerCase()
+                          .includes(assetSearch.toLowerCase()),
+                    )
+                    .map((asset) => (
+                      <button
+                        key={asset.id}
+                        className={
+                          placementAsset?.assetRef === `custom:${asset.id}`
+                            ? "active"
+                            : ""
+                        }
+                        title={`${asset.category} · ${(asset.size / 1024 / 1024).toFixed(1)} MB`}
+                        onClick={() => {
+                          setPlacementAsset({
+                            assetRef: `custom:${asset.id}`,
+                            name: asset.name,
+                            kind: "building",
+                            buildingType:
+                              asset.category === "Faith"
+                                ? "Place of worship"
+                                : asset.category === "Education"
+                                  ? "School"
+                                  : asset.category === "Health"
+                                    ? "Clinic"
+                                    : "Commercial",
+                            width: asset.width,
+                            depth: asset.depth,
+                            height: asset.height,
+                            color: "#d8e2ea",
+                          });
+                          setTool("building");
+                          setDraft([]);
+                        }}
+                      >
+                        <Box size={24} />
+                        <span>{asset.name}</span>
+                        <small>{asset.category}</small>
+                      </button>
+                    ))}
+                  <button
+                    className="asset-import"
+                    onClick={() => setAssetDialog(true)}
+                  >
+                    <Upload size={24} />
+                    <span>Import GLB</span>
+                  </button>
+                </div>
+              </section>
+            ) : rightPanelTab === "utilities" ? (
+              <section id="utilities-content" aria-label="Utility corridors">
+                <h2>Utility corridors</h2>
+                <p className="muted">
+                  Plan water, drainage, electricity and telecom services along a
+                  road.
+                </p>
+                {utilityRoads.length ? (
+                  <>
+                    <label className="field">
+                      Road
+                      <select
+                        aria-label="Utility road"
+                        value={utilityRoad?.id ?? ""}
+                        onChange={(event) => {
+                          setUtilityRoadId(event.target.value);
+                          setSelected(event.target.value);
+                        }}
+                      >
+                        {utilityRoads.map((road) => (
+                          <option key={road.id} value={road.id}>
+                            {road.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      onClick={() => utilityRoad && frame(utilityRoad.id)}
+                    >
+                      <Focus size={14} /> Locate road
+                    </button>
+                    {utilityRoad && (
+                      <section className="utility-editor">
+                        <div className="section-title">
+                          UTILITY CORRIDORS{" "}
+                          <span>
+                            {
+                              project.utilityNetworks.filter(
+                                (network) =>
+                                  network.sourceRoadId === utilityRoad.id,
+                              ).length
+                            }
+                          </span>
+                        </div>
+                        <p className="muted small">
+                          Add concept services along this road. Nearby buildings
+                          within 30 m connect automatically.
+                        </p>
+                        <div className="utility-add-grid">
+                          {(
+                            [
+                              "water",
+                              "wastewater",
+                              "stormwater",
+                              "electricity",
+                              "telecom",
+                            ] as UtilityNetwork["type"][]
+                          ).map((type) => (
+                            <button
+                              key={type}
+                              disabled={project.utilityNetworks.some(
+                                (network) =>
+                                  network.sourceRoadId === utilityRoad.id &&
+                                  network.type === type,
+                              )}
+                              onClick={() =>
+                                addUtilityCorridor(utilityRoad, type)
+                              }
+                            >
+                              <Plus size={13} /> {type}
+                            </button>
+                          ))}
+                        </div>
+                        {project.utilityNetworks
+                          .filter(
+                            (network) =>
+                              network.sourceRoadId === utilityRoad.id,
+                          )
+                          .map((network) => (
+                            <div className="utility-card" key={network.id}>
+                              <div className="utility-card-heading">
+                                <b>{network.type}</b>
+                                <button
+                                  aria-label={`Delete ${network.type} corridor`}
+                                  onClick={() =>
+                                    saveUtilityNetworks(
+                                      project.utilityNetworks.filter(
+                                        (item) => item.id !== network.id,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                              <div className="field-grid">
+                                <label className="field">
+                                  Capacity
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={network.capacity}
+                                    onChange={(event) =>
+                                      updateUtilityNetwork(network.id, {
+                                        capacity: Math.max(
+                                          0,
+                                          event.target.valueAsNumber || 0,
+                                        ),
+                                      })
+                                    }
+                                  />
+                                </label>
+                                <label className="field">
+                                  Unit
+                                  <input
+                                    value={network.capacityUnit}
+                                    maxLength={30}
+                                    onChange={(event) =>
+                                      updateUtilityNetwork(network.id, {
+                                        capacityUnit: event.target.value,
+                                      })
+                                    }
+                                  />
+                                </label>
+                              </div>
+                              <label className="field">
+                                Connection distance (m)
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="500"
+                                  value={network.connectionDistanceM}
+                                  onChange={(event) =>
+                                    updateUtilityNetwork(network.id, {
+                                      connectionDistanceM: Math.min(
+                                        500,
+                                        Math.max(
+                                          1,
+                                          event.target.valueAsNumber || 1,
+                                        ),
+                                      ),
+                                    })
+                                  }
+                                />
+                              </label>
+                              <div className="measure">
+                                <span>Connected buildings</span>
+                                <b>{network.connectedObjectIds.length}</b>
+                              </div>
+                            </div>
+                          ))}
+                      </section>
+                    )}
+                  </>
+                ) : (
+                  <p className="panel-empty">
+                    Draw a road from Assets before adding utility corridors.
+                  </p>
+                )}
+              </section>
+            ) : (
+              <div id="inspector-content">
+                {current ? (
+                  <>
+                    <Properties
+                      key={current.id}
+                      object={current}
+                      onUpdate={updateConnected}
+                      onFrame={() => frame(current.id)}
+                      onMove={() => {
+                        setTool("move");
+                        setDraft([]);
+                      }}
+                      onDelete={() => {
+                        if (edit([], [current.id], "Delete object"))
+                          setSelected("");
+                      }}
+                      onDuplicate={duplicateSelected}
+                    />
+                    {current.kind === "plot" && (
+                      <section className="zone-editor">
+                        <div className="section-title">
+                          ZONING CONTROLS{" "}
+                          <span>{currentZone ? "ACTIVE" : "NONE"}</span>
+                        </div>
+                        {!currentZone ? (
+                          <button
+                            className="zone-create"
+                            onClick={() => createZoneForParcel(current)}
+                          >
+                            <Plus size={14} /> Add residential zone
+                          </button>
+                        ) : (
+                          <>
+                            <label>
+                              Zone name
+                              <input
+                                value={currentZone.name}
+                                onChange={(event) =>
+                                  updateZone(currentZone.id, {
+                                    name: event.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              Zone type
+                              <select
+                                value={currentZone.type}
+                                onChange={(event) =>
+                                  updateZone(currentZone.id, {
+                                    type: event.target.value as Zone["type"],
+                                    allowedBuildingTypes: zoneAllowedUses(
+                                      event.target.value as Zone["type"],
+                                    ),
+                                  })
+                                }
+                              >
+                                {[
+                                  "residential",
+                                  "commercial",
+                                  "mixed-use",
+                                  "education",
+                                  "health",
+                                  "faith",
+                                  "recreation",
+                                  "cemetery",
+                                  "utility",
+                                  "protected",
+                                ].map((type) => (
+                                  <option key={type}>{type}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <div className="zone-grid">
+                              <label>
+                                Max floors
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="60"
+                                  value={currentZone.maximumFloors}
+                                  onChange={(event) =>
+                                    updateZone(currentZone.id, {
+                                      maximumFloors: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Coverage %
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={currentZone.maximumCoveragePercent}
+                                  onChange={(event) =>
+                                    updateZone(currentZone.id, {
+                                      maximumCoveragePercent: Number(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Maximum FAR
+                                <input
+                                  type="number"
+                                  min="0.1"
+                                  max="20"
+                                  step="0.1"
+                                  value={currentZone.maximumFar}
+                                  onChange={(event) =>
+                                    updateZone(currentZone.id, {
+                                      maximumFar: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Min plot m²
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={currentZone.minimumPlotAreaM2}
+                                  onChange={(event) =>
+                                    updateZone(currentZone.id, {
+                                      minimumPlotAreaM2: Number(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Front setback
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.5"
+                                  value={currentZone.frontSetbackM}
+                                  onChange={(event) =>
+                                    updateZone(currentZone.id, {
+                                      frontSetbackM: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Side setback
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.5"
+                                  value={currentZone.sideSetbackM}
+                                  onChange={(event) =>
+                                    updateZone(currentZone.id, {
+                                      sideSetbackM: Number(event.target.value),
+                                    })
+                                  }
+                                />
+                              </label>
+                            </div>
+                          </>
+                        )}
+                      </section>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="empty-inspector">
+                      <MousePointer2 size={30} />
+                      <h3>No object selected</h3>
+                      <p>
+                        Select an object on the map or in Design Objects to
+                        inspect its properties.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </aside>
         ) : (
-          <button
-            className="panel-tab right-tab"
-            aria-label="Open inspector panel"
-            onClick={() => setRightOpen(true)}
-          >
-            <Focus size={16} />
-            <span>Inspector</span>
-          </button>
+          <div className="right-panel-rail" aria-label="Workspace panels">
+            {panelSections.map(([tab, label, Icon]) => (
+              <button
+                key={tab}
+                className={
+                  "panel-tab right-tab" +
+                  (tab === "warnings" ? " warnings-rail-tab" : "")
+                }
+                aria-label={"Open " + tab + " panel"}
+                onClick={() => {
+                  setRightPanelTab(tab);
+                  setRightOpen(true);
+                }}
+              >
+                <Icon size={16} />
+                <span>{label}</span>
+                {tab === "warnings" && (
+                  <b className="warnings-rail-count">{activeWarnings.length}</b>
+                )}
+              </button>
+            ))}
+          </div>
         )}
       </div>
       <input
@@ -2535,7 +3745,7 @@ export default function App() {
         hidden
         ref={projectFile}
         type="file"
-        accept=".json,application/json"
+        accept=".sitecraft,.json,application/json"
         onChange={openProjectComputerFile}
       />
       <footer>
@@ -2717,7 +3927,14 @@ export default function App() {
                       requestProjectSwitch(zarajNzProject(), false)
                     }
                   >
-                    Load Zaraj demo
+                    Load Avalon Heights demo
+                  </button>
+                  <button
+                    onClick={() =>
+                      requestProjectSwitch(cinematicSocietyProject(), false)
+                    }
+                  >
+                    Load Cinematic Society demo
                   </button>
                 </div>
               </>
@@ -2835,6 +4052,38 @@ export default function App() {
               )}
               {placementDialog.object.kind === "road" && (
                 <>
+                  <label className="field wide">
+                    Road purpose
+                    <select
+                      value={
+                        placementDialog.object.assetRef ===
+                        "builtin:road:external-access"
+                          ? "external"
+                          : "internal"
+                      }
+                      onChange={(event) => {
+                        const external = event.target.value === "external";
+                        updatePlacementObject({
+                          assetRef: external
+                            ? "builtin:road:external-access"
+                            : "",
+                          name:
+                            external && placementDialog.object.name === "Road"
+                              ? "Site access road"
+                              : placementDialog.object.name,
+                        });
+                      }}
+                    >
+                      <option value="internal">Internal site road</option>
+                      <option value="external">External access road</option>
+                    </select>
+                    <small>
+                      {placementDialog.object.assetRef ===
+                      "builtin:road:external-access"
+                        ? "Draw from a point inside the boundary to the existing road outside."
+                        : "All points and the full road width must remain inside one site boundary."}
+                    </small>
+                  </label>
                   <label className="field">
                     Road width (m)
                     <input
@@ -2984,16 +4233,13 @@ export default function App() {
                     <small>
                       {object.kind === "boundary" ? "SITE SIZE" : "SIZE CHECK"}
                     </small>
-                    <b>
-                      {required.toFixed(1)} m² ·{" "}
-                      {(required / 25.2929).toFixed(2)} marla
-                    </b>
+                    <b>{formatAreaNZ(required)}</b>
                   </div>
                   {object.kind !== "boundary" && (
                     <span>
                       {fits
-                        ? `Fits area capacity · site ${capacity.toFixed(1)} m²`
-                        : `Too large · site capacity ${capacity.toFixed(1)} m²`}
+                        ? `Fits area capacity · site ${formatAreaNZ(capacity)}`
+                        : `Too large · site capacity ${formatAreaNZ(capacity)}`}
                     </span>
                   )}
                 </div>
@@ -3091,44 +4337,77 @@ export default function App() {
                   </article>
                   <article>
                     <small>ROADS WITHIN 150 M</small>
-                    <b>{siteAnalysis.result.nearbyRoads}</b>
+                    <b>
+                      {siteAnalysis.result.sourceAvailable
+                        ? siteAnalysis.result.nearbyRoads
+                        : "Unknown"}
+                    </b>
+                  </article>
+                  <article>
+                    <small>SURFACE CHECK</small>
+                    <b>
+                      {siteAnalysis.result.surface === "water"
+                        ? "Water"
+                        : siteAnalysis.result.surface === "land"
+                          ? "Land"
+                          : "Unknown"}
+                    </b>
                   </article>
                 </div>
                 <div className="analysis-sections">
                   <article>
                     <h3>Road access</h3>
-                    {siteAnalysis.result.nearestRoad ? (
+                    {!siteAnalysis.result.sourceAvailable ? (
+                      <p>
+                        Road data could not be checked. The visible basemap is
+                        imagery only and is not proof that the road query
+                        succeeded.
+                      </p>
+                    ) : siteAnalysis.result.nearestRoad ? (
                       <p>
                         Nearest mapped road:{" "}
                         <b>{siteAnalysis.result.nearestRoad.name}</b> ·{" "}
                         {siteAnalysis.result.nearestRoad.distanceM.toFixed(0)} m
                       </p>
                     ) : (
-                      <p>No mapped road was found nearby.</p>
+                      <p>No road mapped in OpenStreetMap was found nearby.</p>
                     )}
                     <div className="analysis-tags">
                       {siteAnalysis.result.accessRoads.map((road) => (
                         <span key={road}>{road}</span>
                       ))}
-                      {!siteAnalysis.result.accessRoads.length && (
-                        <span className="warning-tag">Access required</span>
+                      {siteAnalysis.result.sourceAvailable &&
+                        !siteAnalysis.result.accessRoads.length && (
+                          <span className="warning-tag">Access required</span>
+                        )}
+                      {!siteAnalysis.result.sourceAvailable && (
+                        <span className="warning-tag">Not checked</span>
                       )}
                     </div>
                   </article>
                   <article>
                     <h3>Existing context</h3>
-                    <p>
-                      {siteAnalysis.result.existingBuildings} mapped buildings ·{" "}
-                      {siteAnalysis.result.waterFeatures} water features
-                    </p>
-                    <p className="intersection-summary">
-                      <b>{siteAnalysis.result.intersectingBuildings}</b>{" "}
-                      buildings ·{" "}
-                      <b>{siteAnalysis.result.intersectingWaterFeatures}</b>{" "}
-                      water features ·{" "}
-                      <b>{siteAnalysis.result.intersectingRoads}</b> roads
-                      intersect site
-                    </p>
+                    {siteAnalysis.result.sourceAvailable ? (
+                      <>
+                        <p>
+                          {siteAnalysis.result.existingBuildings} mapped
+                          buildings · {siteAnalysis.result.waterFeatures} water
+                          features
+                        </p>
+                        <p className="intersection-summary">
+                          <b>{siteAnalysis.result.intersectingBuildings}</b>{" "}
+                          buildings ·{" "}
+                          <b>{siteAnalysis.result.intersectingWaterFeatures}</b>{" "}
+                          water features ·{" "}
+                          <b>{siteAnalysis.result.intersectingRoads}</b> roads
+                          intersect site
+                        </p>
+                      </>
+                    ) : (
+                      <p>
+                        Buildings, water, roads and land use were not checked.
+                      </p>
+                    )}
                     <div className="analysis-tags">
                       {(siteAnalysis.result.intersectingLandUse.length
                         ? siteAnalysis.result.intersectingLandUse
@@ -3136,8 +4415,12 @@ export default function App() {
                       ).map((item) => (
                         <span key={item}>{item.replaceAll("_", " ")}</span>
                       ))}
-                      {!siteAnalysis.result.landUse.length && (
-                        <span>No mapped land use</span>
+                      {siteAnalysis.result.sourceAvailable &&
+                        !siteAnalysis.result.landUse.length && (
+                          <span>No mapped land use</span>
+                        )}
+                      {!siteAnalysis.result.sourceAvailable && (
+                        <span>Map context unknown</span>
                       )}
                     </div>
                   </article>
@@ -3153,8 +4436,14 @@ export default function App() {
                 <small className="analysis-source">
                   {siteAnalysis.result.sourceAvailable
                     ? `Map context: © OpenStreetMap contributors · checked ${new Date(siteAnalysis.result.checkedAt).toLocaleString()}. Concept check only.`
-                    : "Local boundary measurements only."}
+                    : "Only area, size and perimeter were calculated locally. Road, building, water and land-use values are unknown."}
                 </small>
+                {siteAnalysis.result.surface !== "unknown" && (
+                  <small className="analysis-source">
+                    Surface classification came from a separate location lookup;
+                    it does not mean road and context data succeeded.
+                  </small>
+                )}
               </>
             )}
             <div className="modal-actions">
@@ -3332,7 +4621,7 @@ export default function App() {
                     setAssetName("");
                     setError("");
                   } catch (e) {
-                    setError(e instanceof Error ? e.message : String(e));
+                    setError(friendlyError(e));
                   } finally {
                     setImportingAsset(false);
                   }
@@ -3437,7 +4726,7 @@ function Properties({
         </button>
       </div>
       <p className="muted small">
-        Map par blue point ko drag karke shape ya size adjust karein.
+        Drag the blue handles on the map to adjust the shape or size.
       </p>
       {o.kind === "road" && (
         <>
@@ -3617,8 +4906,8 @@ function Properties({
       )}
       {o.kind === "bridge" && (
         <p className="muted small">
-          Blue corner handles se deck ki width aur length adjust karein. No
-          approaches, clearance or structural checks.
+          Drag the blue corner handles to adjust deck width and length.
+          Approaches, clearance and structural checks are not included.
         </p>
       )}
       <details>
