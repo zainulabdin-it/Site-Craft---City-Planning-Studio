@@ -17,6 +17,7 @@ import {
   distance,
 } from "./geometry";
 import { getCustomAssetUrlSync, hydrateCustomAssetUrls } from "./assetStorage";
+import { locationRadiusMeters, streetApproach } from "./navigation";
 export type ViewAction = {
   type:
     | "frame"
@@ -97,6 +98,7 @@ export function Viewport(props: Props) {
     modeCache = useRef(""),
     terrainActive = useRef(false),
     hasInitialFrame = useRef(false),
+    navigationRequest = useRef(0),
     renderingStartedAt = useRef(Date.now());
   latest.current = props;
   useEffect(() => {
@@ -203,6 +205,7 @@ export function Viewport(props: Props) {
         return;
       event.preventDefault();
       held.add(event.code);
+      navigationRequest.current++;
       viewer.current?.camera.cancelFlight();
       if (!animation) animation = requestAnimationFrame(tick);
     };
@@ -2668,6 +2671,29 @@ export function Viewport(props: Props) {
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
+    const requestId = ++navigationRequest.current;
+    const isCurrentRequest = () =>
+      !v.isDestroyed() && requestId === navigationRequest.current;
+    v.camera.cancelFlight();
+    const atGround = (coordinates: Point, apply: (height: number) => void) => {
+      const position = C.Cartographic.fromDegrees(...coordinates);
+      // The coarse globe mesh can report a negative intersection before its
+      // tiles load. Flat mode has a known zero-height surface.
+      const height = terrainActive.current
+        ? (v.scene.globe.getHeight(position) ?? 0)
+        : 0;
+      if (!terrainActive.current) {
+        if (isCurrentRequest()) apply(height);
+        return;
+      }
+      C.sampleTerrainMostDetailed(v.terrainProvider, [position])
+        .then(([sample]) => {
+          if (isCurrentRequest()) apply(sample.height ?? height);
+        })
+        .catch(() => {
+          if (isCurrentRequest()) apply(height);
+        });
+    };
     if (props.action.type === "zoom-in" || props.action.type === "zoom-out") {
       const height = v.camera.positionCartographic.height,
         amount = Math.max(2, height * 0.35);
@@ -2716,45 +2742,42 @@ export function Viewport(props: Props) {
       return;
     }
     if (props.action.type === "location" && props.action.location) {
-      const { center, bounds } = props.action.location,
-        width = Math.max(bounds[2] - bounds[0], 0.01),
-        height = Math.max(bounds[3] - bounds[1], 0.01);
-      if (props.viewMode === "street") {
-        v.camera.flyTo({
-          destination: C.Cartesian3.fromDegrees(center[0], center[1], 18),
-          orientation: {
-            heading: v.camera.heading,
-            pitch: -0.18,
-            roll: 0,
+      const { center, bounds } = props.action.location;
+      if (props.viewMode === "2d") {
+        const radius = locationRadiusMeters(center, bounds);
+        v.camera.flyToBoundingSphere(
+          new C.BoundingSphere(C.Cartesian3.fromDegrees(...center), radius),
+          {
+            offset: new C.HeadingPitchRange(0, -Math.PI / 2, radius * 3),
+            duration: 0.8,
           },
-          duration: 1.1,
-        });
-        return;
-      }
-      if (props.viewMode === "3d") {
-        const spanMetres = Math.max(width, height) * 111_320;
-        v.camera.flyTo({
-          destination: C.Cartesian3.fromDegrees(
-            center[0],
-            center[1],
-            Math.max(900, spanMetres * 1.35),
+        );
+      } else if (props.viewMode === "street") {
+        const heading = v.camera.heading;
+        atGround(center, (height) =>
+          v.camera.flyTo({
+            destination: C.Cartesian3.fromDegrees(...center, height + 1.7),
+            orientation: { heading, pitch: 0, roll: 0 },
+            duration: 0.8,
+          }),
+        );
+      } else {
+        const radius = locationRadiusMeters(center, bounds);
+        const heading = v.camera.heading;
+        const pitch = Math.min(-0.3, Math.max(-1.15, v.camera.pitch));
+        atGround(center, (height) =>
+          v.camera.flyToBoundingSphere(
+            new C.BoundingSphere(
+              C.Cartesian3.fromDegrees(...center, height),
+              radius,
+            ),
+            {
+              offset: new C.HeadingPitchRange(heading, pitch, radius * 2.2),
+              duration: 0.8,
+            },
           ),
-          orientation: {
-            heading: v.camera.heading,
-            pitch: -0.62,
-            roll: 0,
-          },
-          duration: 1.1,
-        });
-        return;
+        );
       }
-      const rectangle = C.Rectangle.fromDegrees(
-        center[0] - width / 2,
-        center[1] - height / 2,
-        center[0] + width / 2,
-        center[1] + height / 2,
-      );
-      v.camera.flyTo({ destination: rectangle, duration: 1.1 });
       return;
     }
     if (props.action.type === "street") {
@@ -2840,7 +2863,7 @@ export function Viewport(props: Props) {
       C.sampleTerrainMostDetailed(v.terrainProvider, [streetCartographic])
         .catch(() => [streetCartographic])
         .then(([sample]) => {
-          if (v.isDestroyed()) return;
+          if (!isCurrentRequest()) return;
           v.camera.flyTo({
             destination: C.Cartesian3.fromRadians(
               sample.longitude,
@@ -2927,12 +2950,17 @@ export function Viewport(props: Props) {
       return;
     }
     const o = props.project.objects.find((o) => o.id === props.action.id);
-    const points = (o && ["building", "bridge"].includes(o.kind)
-      ? footprint(o)
-      : o?.points) ||
-      props.project.objects.find((o) => o.kind === "boundary")?.points || [
-        [0, 0],
-      ];
+    const projectPoints = props.project.objects
+      .filter((object) => object.kind === "boundary")
+      .flatMap((object) => object.points);
+    const points =
+      (o && ["building", "bridge"].includes(o.kind)
+        ? footprint(o)
+        : o?.points) ||
+      (projectPoints.length
+        ? projectPoints
+        : props.project.objects.flatMap((object) => object.points));
+    if (!points.length) points.push([0, 0]);
     const center: Point = [
       points.reduce((s, q) => s + q[0], 0) / points.length,
       points.reduce((s, q) => s + q[1], 0) / points.length,
@@ -2949,59 +2977,65 @@ export function Viewport(props: Props) {
     );
     const ll = toGeo(center, props.project.origin);
     if (props.action.type === "frame" && props.viewMode === "street") {
-      const heading = v.camera.heading;
-      const standOff = o ? Math.max(15, radius * 1.8) : 20;
-      const approach = toGeo(
-        [
-          center[0] - Math.sin(heading) * standOff,
-          center[1] - Math.cos(heading) * standOff,
-        ],
-        props.project.origin,
+      const approach = streetApproach(
+        center,
+        radius,
+        props.project.objects.filter((object) => object.kind === "road"),
+        v.camera.heading,
       );
-      v.camera.flyTo({
-        destination: C.Cartesian3.fromDegrees(...approach, 1.7),
-        orientation: {
-          heading,
-          pitch: 0,
-          roll: 0,
-        },
-        duration: 0.6,
-      });
+      const coordinates = toGeo(approach.eye, props.project.origin);
+      atGround(coordinates, (height) =>
+        v.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(
+            ...coordinates,
+            height + approach.height,
+          ),
+          orientation: { heading: approach.heading, pitch: 0, roll: 0 },
+          duration: 0.6,
+        }),
+      );
       return;
     }
     const preservePerspective =
       props.action.type === "frame" &&
       ["3d", "cinematic"].includes(props.viewMode);
-    v.camera.flyToBoundingSphere(
-      new C.BoundingSphere(
-        C.Cartesian3.fromDegrees(...ll, targetHeight),
-        radius,
-      ),
-      {
-        duration: 0.6,
-        offset: new C.HeadingPitchRange(
-          props.action.type === "drone"
-            ? -0.78
-            : preservePerspective
-              ? v.camera.heading
-              : props.action.type === "perspective"
-                ? -0.58
-                : 0,
-          props.action.type === "drone"
-            ? -0.68
-            : preservePerspective
-              ? Math.min(-0.25, Math.max(-1.35, v.camera.pitch))
-              : props.action.type === "perspective"
-                ? -0.52
-                : -Math.PI / 2,
-          radius *
-            (props.action.type === "drone"
-              ? 1.35
-              : props.action.type === "perspective" || preservePerspective
-                ? 1.85
-                : 3),
+    const viewHeading = v.camera.heading;
+    const viewPitch = v.camera.pitch;
+    atGround(ll, (groundHeight) =>
+      v.camera.flyToBoundingSphere(
+        new C.BoundingSphere(
+          C.Cartesian3.fromDegrees(
+            ...ll,
+            groundHeight + (o?.elevation ?? 0) + targetHeight,
+          ),
+          radius,
         ),
-      },
+        {
+          duration: 0.6,
+          offset: new C.HeadingPitchRange(
+            props.action.type === "drone"
+              ? -0.78
+              : preservePerspective
+                ? viewHeading
+                : props.action.type === "perspective"
+                  ? -0.58
+                  : 0,
+            props.action.type === "drone"
+              ? -0.68
+              : preservePerspective
+                ? Math.min(-0.25, Math.max(-1.15, viewPitch))
+                : props.action.type === "perspective"
+                  ? -0.52
+                  : -Math.PI / 2,
+            radius *
+              (props.action.type === "drone"
+                ? 1.35
+                : props.action.type === "perspective" || preservePerspective
+                  ? 1.85
+                  : 3),
+          ),
+        },
+      ),
     );
   }, [props.action, props.navigationProfile]);
   return (

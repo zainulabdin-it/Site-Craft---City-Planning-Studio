@@ -30,6 +30,7 @@ Last update: 2026-10-16
 - [x] Design Objects se object par size ke mutabiq zoom; current view type preserve. [Detail](2026-10-16-object-focus-and-road-editing.md)
 - [x] Compact Layers header; separate Inspector, Assets, Utilities and Warnings panels. [Details](2026-10-16-workspace-panels-and-live-coordinates.md)
 - [x] Larger live pointer coordinates, actual camera status and standard English application help text.
+- [x] Move to location: preserve view mode, frame destinations and approach landmarks from nearby project roads. [Details](2026-10-16-move-to-location.md)
 
 ## Abhi baqi / advanced kaam
 
