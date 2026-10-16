@@ -41,3 +41,17 @@ def test_projection_roundtrip():
 def test_invalid_asset_key():
     from app.storage import safe_key
     with pytest.raises(ValueError): safe_key('../private.glb')
+
+
+def test_layer_controls_and_presentation_survive_save_restore():
+    p = project()
+    p['schemaVersion'] = 4
+    p['layerControls'] = [dict(id='utility:gas', visible=False, opacity=.4, locked=True, displayOffsetM=25)]
+    p['layerPresentation'] = dict(exploded=True, spacingM=20)
+    p['utilityNetworks'] = [dict(id=str(uuid4()), name='Gas corridor', type='gas', points=[[0, 0], [20, 0]], capacity=5, capacityUnit='m³/h', connectionDistanceM=30, connectedObjectIds=[], source='Concept test', confidence='indicative')]
+    response = client.put(f"/api/projects/{p['id']}", json=p)
+    assert response.status_code == 200, response.text
+    restored = client.get(f"/api/projects/{p['id']}").json()
+    assert restored['layerControls'] == p['layerControls']
+    assert restored['layerPresentation'] == p['layerPresentation']
+    assert restored['utilityNetworks'][0]['points'] == p['utilityNetworks'][0]['points']

@@ -135,7 +135,7 @@ class UtilityNetwork(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
     id: UUID
     name: str = Field(min_length=1, max_length=100)
-    type: Literal['water', 'wastewater', 'stormwater', 'electricity', 'telecom']
+    type: Literal['water', 'wastewater', 'stormwater', 'electricity', 'gas', 'telecom']
     sourceRoadId: UUID | None = None
     points: list[tuple[float, float]] = Field(min_length=2, max_length=500)
     capacity: float = Field(ge=0, le=1_000_000)
@@ -144,6 +144,19 @@ class UtilityNetwork(BaseModel):
     connectedObjectIds: list[UUID] = Field(max_length=2000)
     source: str = Field(max_length=200)
     confidence: Literal['authoritative', 'indicative', 'unknown']
+
+class LayerControl(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    id: str = Field(min_length=1, max_length=150)
+    visible: bool
+    opacity: float = Field(ge=0, le=1)
+    locked: bool
+    displayOffsetM: float = Field(ge=-200, le=500)
+
+class LayerPresentation(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+    exploded: bool = False
+    spacingM: float = Field(default=15, ge=0, le=100)
 
 class Project(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
@@ -165,6 +178,8 @@ class Project(BaseModel):
     zones: list[Zone] = Field(default_factory=list, max_length=500)
     alternatives: list[ScenarioSnapshot] = Field(default_factory=list, max_length=10)
     utilityNetworks: list[UtilityNetwork] = Field(default_factory=list, max_length=500)
+    layerControls: list[LayerControl] = Field(default_factory=list, max_length=200)
+    layerPresentation: LayerPresentation = Field(default_factory=LayerPresentation)
 
     @model_validator(mode='after')
     def validate_design(self):

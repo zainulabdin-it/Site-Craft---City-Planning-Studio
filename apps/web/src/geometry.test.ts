@@ -234,6 +234,8 @@ describe("metric geometry and project commands", () => {
     delete (legacy as { zones?: unknown }).zones;
     delete (legacy as { alternatives?: unknown }).alternatives;
     delete (legacy as { utilityNetworks?: unknown }).utilityNetworks;
+    delete (legacy as { layerControls?: unknown }).layerControls;
+    delete (legacy as { layerPresentation?: unknown }).layerPresentation;
     const migrated = validateProject(legacy);
     expect(migrated.schemaVersion).toBe(4);
     expect(migrated.objects).toEqual(current.objects);
@@ -252,6 +254,8 @@ describe("metric geometry and project commands", () => {
     delete previous.zones;
     delete previous.alternatives;
     delete previous.utilityNetworks;
+    delete previous.layerControls;
+    delete previous.layerPresentation;
     const migrated = validateProject(previous);
     expect(migrated.schemaVersion).toBe(4);
     expect(migrated.objects).toEqual(current.objects);
@@ -268,6 +272,8 @@ describe("metric geometry and project commands", () => {
     delete previous.zones;
     delete previous.alternatives;
     delete previous.utilityNetworks;
+    delete previous.layerControls;
+    delete previous.layerPresentation;
     const migrated = validateProject(previous);
     expect(migrated.schemaVersion).toBe(4);
     expect(migrated.planningSettings.residentsPerUnit).toBe(4);

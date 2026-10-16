@@ -107,6 +107,14 @@ import {
 import { friendlyError } from "./errors";
 import { analyzePlanning } from "./planningAnalysis";
 import { openPlanningReport } from "./planningReport";
+import { LayerWorkspace } from "./LayerWorkspace";
+import {
+  assertLayersEditable,
+  displayOffset,
+  getLayerControl,
+  updateLayerControl,
+  utilityTypes,
+} from "./layerControls";
 
 type ShapeChoice = { value: string; label: string; preview: string };
 const zoneAllowedUses = (
@@ -413,6 +421,22 @@ export default function App() {
     setStatus("Unsaved");
   };
   const saveUtilityNetworks = (networks: UtilityNetwork[]) => {
+    const affected = [...project.utilityNetworks, ...networks].filter(
+      (network) =>
+        JSON.stringify(
+          project.utilityNetworks.find((item) => item.id === network.id),
+        ) !== JSON.stringify(networks.find((item) => item.id === network.id)),
+    );
+    if (
+      affected.some(
+        (network) => getLayerControl(project, `utility:${network.type}`).locked,
+      )
+    ) {
+      setError(
+        "This utility layer is locked. Unlock it in Layers before editing.",
+      );
+      return;
+    }
     setProject((currentProject) => ({
       ...currentProject,
       utilityNetworks: networks,
@@ -445,6 +469,7 @@ export default function App() {
       stormwater: "m³",
       electricity: "kVA",
       telecom: "connections",
+      gas: "m³/h",
     };
     saveUtilityNetworks([
       ...project.utilityNetworks,
@@ -592,6 +617,10 @@ export default function App() {
     label = "Edit object",
   ) => {
     try {
+      assertLayersEditable(project, [
+        ...updates,
+        ...project.objects.filter((object) => remove.includes(object.id)),
+      ]);
       const c = command(project, label, updates, remove);
       const p = applyCommand(project, c);
       validateObjectCollisions(p, new Set(updates.map((object) => object.id)));
@@ -677,6 +706,52 @@ export default function App() {
     else if (type.startsWith("cinematic-")) setViewMode("cinematic");
     setAction({ id, type, seq: Date.now() });
   };
+  const changeLayerControl = (
+    id: string,
+    changes: Partial<Project["layerControls"][number]>,
+  ) => {
+    setProject((current) => updateLayerControl(current, id, changes));
+    version.current++;
+    setStatus("Unsaved");
+  };
+  const changeLayerPresentation = (
+    changes: Partial<Project["layerPresentation"]>,
+  ) => {
+    setProject((current) => ({
+      ...current,
+      layerPresentation: { ...current.layerPresentation, ...changes },
+      layerControls:
+        changes.exploded === false
+          ? current.layerControls.map((control) => ({
+              ...control,
+              displayOffsetM: 0,
+            }))
+          : current.layerControls,
+    }));
+    version.current++;
+    setStatus("Unsaved");
+    if (changes.exploded && viewMode === "2d") frame(undefined, "perspective");
+  };
+  const renderVisible = useMemo(
+    () =>
+      Object.fromEntries(
+        kinds.map((kind) => [
+          kind,
+          getLayerControl(project, `design:${kind}`).visible,
+        ]),
+      ) as Record<Kind, boolean>,
+    [project.designLayers, project.layerControls],
+  );
+  const renderOpacity = useMemo(
+    () =>
+      Object.fromEntries(
+        kinds.map((kind) => [
+          kind,
+          getLayerControl(project, `design:${kind}`).opacity,
+        ]),
+      ) as Record<Kind, number>,
+    [project.designLayers, project.layerControls],
+  );
   const persistDesignLayers = (
     order: Kind[],
     nextVisible = visible,
@@ -704,6 +779,14 @@ export default function App() {
       const stack = back ? undo : redo,
         c = stack.at(-1);
       if (!c) return;
+      assertLayersEditable(
+        project,
+        c.changes.flatMap((change) =>
+          [change.before, change.after].filter(
+            (object): object is DesignObject => !!object,
+          ),
+        ),
+      );
       setProject(applyCommand(project, c, back));
       version.current++;
       if (back) {
@@ -975,12 +1058,20 @@ export default function App() {
     const object = project.objects.find((o) => o.id === id);
     if (!object || object.kind === "boundary") return;
     setSelected(id);
+    if (displayOffset(project, `design:${object.kind}`, viewMode)) {
+      setError("Assemble this layer before dragging geometry.");
+      return;
+    }
     updateConnected(moveTo(object, anchor));
   };
   const resizeObject = (id: string, handle: number, target: Point) => {
     const object = project.objects.find((o) => o.id === id);
     if (!object) return;
     setSelected(id);
+    if (displayOffset(project, `design:${object.kind}`, viewMode)) {
+      setError("Assemble this layer before dragging geometry.");
+      return;
+    }
     const resized = resizeFromHandle(object, handle, target);
     if (object.kind === "road") updateConnected(resized);
     else edit([resized], [], "Resize object");
@@ -1111,12 +1202,24 @@ export default function App() {
     setStatus("Unsaved");
   };
   const updateDataLayer = (id: string, changes: Partial<DataLayer>) => {
-    setProject((p) => ({
-      ...p,
-      dataLayers: p.dataLayers.map((layer) =>
-        layer.id === id ? { ...layer, ...changes } : layer,
-      ),
-    }));
+    setProject((p) => {
+      const next = {
+        ...p,
+        dataLayers: p.dataLayers.map((layer) =>
+          layer.id === id ? { ...layer, ...changes } : layer,
+        ),
+      };
+      return changes.visible !== undefined || changes.opacity !== undefined
+        ? updateLayerControl(next, `data:${id}`, {
+            ...(changes.visible !== undefined
+              ? { visible: changes.visible }
+              : {}),
+            ...(changes.opacity !== undefined
+              ? { opacity: changes.opacity }
+              : {}),
+          })
+        : next;
+    });
     version.current++;
     setStatus("Unsaved");
   };
@@ -1266,6 +1369,11 @@ export default function App() {
   const viewportProject = useMemo(
     () => ({
       ...project,
+      dataLayers: project.dataLayers.map((layer) => ({
+        ...layer,
+        visible: getLayerControl(project, `data:${layer.id}`).visible,
+        opacity: getLayerControl(project, `data:${layer.id}`).opacity,
+      })),
       objects: [
         ...project.objects,
         ...project.projectLayers
@@ -1797,6 +1905,8 @@ export default function App() {
               <Layers size={15} /> Layers{" "}
               <span>
                 {kinds.length +
+                  utilityTypes.length +
+                  1 +
                   project.dataLayers.length +
                   project.projectLayers.length}{" "}
                 {layersOpen ? "⌃" : "⌄"}
@@ -2044,256 +2154,203 @@ export default function App() {
                 ))}
                 {currentProjectExpanded && (
                   <div className="current-project-contents">
-                    <div className="layer-group-label">
-                      Current object layers
-                    </div>
-                    <button
-                      className="wide import-layer"
-                      onClick={() => file.current?.click()}
-                    >
-                      <Plus size={14} /> Import GeoJSON
-                    </button>
-                    {layerOrder.map((k, index) => {
-                      const Icon = icons[k];
-                      return (
-                        <div key={k} className="layer-card">
-                          <div className="layer">
-                            <input
-                              aria-label={`Show ${k} layer`}
-                              type="checkbox"
-                              checked={visible[k]}
-                              onChange={(e) => {
-                                const next = {
-                                  ...visible,
-                                  [k]: e.target.checked,
-                                };
-                                setVisible(next);
-                                persistDesignLayers(layerOrder, next, opacity);
-                              }}
-                            />
-                            <Icon size={15} />
-                            <span>
-                              {k === "boundary"
-                                ? "Site boundary"
-                                : k[0].toUpperCase() + k.slice(1)}
-                            </span>
-                            <small>
-                              {
-                                project.objects.filter((o) => o.kind === k)
-                                  .length
-                              }
-                            </small>
-                            <button
-                              className="icon-button"
-                              aria-label={`Move ${k} layer up`}
-                              disabled={index === 0}
-                              onClick={() => {
-                                const next = [...layerOrder];
-                                [next[index - 1], next[index]] = [
-                                  next[index],
-                                  next[index - 1],
-                                ];
-                                setLayerOrder(next);
-                                persistDesignLayers(next);
-                              }}
-                            >
-                              ↑
-                            </button>
-                            <button
-                              className="icon-button"
-                              aria-label={`Move ${k} layer down`}
-                              disabled={index === layerOrder.length - 1}
-                              onClick={() => {
-                                const next = [...layerOrder];
-                                [next[index], next[index + 1]] = [
-                                  next[index + 1],
-                                  next[index],
-                                ];
-                                setLayerOrder(next);
-                                persistDesignLayers(next);
-                              }}
-                            >
-                              ↓
-                            </button>
-                          </div>
-                          <label className="layer-opacity">
-                            Opacity{" "}
-                            <input
-                              type="range"
-                              min="0"
-                              max="1"
-                              step="0.05"
-                              value={opacity[k]}
-                              style={{
-                                background: `linear-gradient(to right, #2563eb ${opacity[k] * 100}%, #dbeafe ${opacity[k] * 100}%)`,
-                              }}
-                              onChange={(e) => {
-                                const next = {
-                                  ...opacity,
-                                  [k]: Number(e.target.value),
-                                };
-                                setOpacity(next);
-                                persistDesignLayers(layerOrder, visible, next);
-                              }}
-                            />
-                            <span>{Math.round(opacity[k] * 100)}%</span>
-                          </label>
-                        </div>
-                      );
-                    })}
-                    {project.dataLayers.map((layer) => (
-                      <div key={layer.id} className="layer-card imported-layer">
-                        <div className="layer">
-                          <input
-                            aria-label={`Show ${layer.name} layer`}
-                            type="checkbox"
-                            checked={layer.visible}
-                            onChange={(e) =>
-                              updateDataLayer(layer.id, {
-                                visible: e.target.checked,
-                              })
-                            }
-                          />
-                          <Layers size={15} />
-                          <span title={layer.name}>{layer.name}</span>
-                          <small>{layer.features.length}</small>
-                          <input
-                            aria-label={`${layer.name} color`}
-                            className="layer-color"
-                            type="color"
-                            value={layer.color}
-                            onChange={(e) =>
-                              updateDataLayer(layer.id, {
-                                color: e.target.value,
-                              })
-                            }
-                          />
-                          <button
-                            className="icon-button"
-                            aria-label={`Delete ${layer.name} layer`}
-                            onClick={() => {
-                              setProject((p) => ({
-                                ...p,
-                                dataLayers: p.dataLayers.filter(
-                                  (x) => x.id !== layer.id,
-                                ),
-                              }));
-                              version.current++;
-                              setStatus("Unsaved");
-                            }}
+                    <LayerWorkspace
+                      project={project}
+                      onUpdate={changeLayerControl}
+                      onPresentation={changeLayerPresentation}
+                      onImport={() => file.current?.click()}
+                      terrainAvailable={terrainAnalysis.available}
+                      onReorder={(order) => {
+                        setLayerOrder(order);
+                        persistDesignLayers(order);
+                      }}
+                      onBrowse={(kind) => {
+                        setObjectKindFilter(kind);
+                        setObjectSearch("");
+                        setLayersOpen(false);
+                        setObjectsOpen(true);
+                      }}
+                    />
+                    {project.dataLayers.length > 0 && (
+                      <details className="reference-advanced">
+                        <summary>
+                          Reference data: style and hazard settings
+                        </summary>
+                        {project.dataLayers.map((layer) => (
+                          <div
+                            key={layer.id}
+                            className="layer-card imported-layer"
                           >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                        <label className="layer-opacity">
-                          Opacity
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={layer.opacity}
-                            style={{
-                              background: `linear-gradient(to right, #2563eb ${layer.opacity * 100}%, #dbeafe ${layer.opacity * 100}%)`,
-                            }}
-                            onChange={(e) =>
-                              updateDataLayer(layer.id, {
-                                opacity: Number(e.target.value),
-                              })
-                            }
-                          />
-                          <span>{Math.round(layer.opacity * 100)}%</span>
-                        </label>
-                        <div className="hazard-layer-controls">
-                          <label className="field">
-                            Planning role
-                            <select
-                              value={layer.hazardType || "context"}
-                              onChange={(event) =>
-                                updateDataLayer(layer.id, {
-                                  hazardType:
-                                    event.target.value === "context"
-                                      ? undefined
-                                      : (event.target
-                                          .value as DataLayer["hazardType"]),
-                                  hazardSeverity:
-                                    event.target.value === "context"
-                                      ? undefined
-                                      : layer.hazardSeverity || "review",
-                                  confidence:
-                                    event.target.value === "context"
-                                      ? undefined
-                                      : layer.confidence || "unknown",
-                                })
-                              }
-                            >
-                              <option value="context">Context only</option>
-                              <option value="flood">Flood hazard</option>
-                              <option value="liquefaction">
-                                Liquefaction hazard
-                              </option>
-                              <option value="coastal">Coastal hazard</option>
-                              <option value="fault">Fault hazard</option>
-                              <option value="contamination">
-                                Contamination hazard
-                              </option>
-                            </select>
-                          </label>
-                          {layer.hazardType && (
-                            <>
+                            <div className="layer">
+                              <input
+                                aria-label={`Show ${layer.name} layer`}
+                                type="checkbox"
+                                checked={layer.visible}
+                                onChange={(e) =>
+                                  updateDataLayer(layer.id, {
+                                    visible: e.target.checked,
+                                  })
+                                }
+                              />
+                              <Layers size={15} />
+                              <span title={layer.name}>{layer.name}</span>
+                              <small>{layer.features.length}</small>
+                              <input
+                                aria-label={`${layer.name} color`}
+                                className="layer-color"
+                                type="color"
+                                value={layer.color}
+                                onChange={(e) =>
+                                  updateDataLayer(layer.id, {
+                                    color: e.target.value,
+                                  })
+                                }
+                              />
+                              <button
+                                className="icon-button"
+                                aria-label={`Delete ${layer.name} layer`}
+                                onClick={() => {
+                                  if (
+                                    getLayerControl(project, `data:${layer.id}`)
+                                      .locked
+                                  ) {
+                                    setError(
+                                      "Unlock this reference layer before deleting it.",
+                                    );
+                                    return;
+                                  }
+                                  setProject((p) => ({
+                                    ...p,
+                                    dataLayers: p.dataLayers.filter(
+                                      (x) => x.id !== layer.id,
+                                    ),
+                                  }));
+                                  version.current++;
+                                  setStatus("Unsaved");
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            <label className="layer-opacity">
+                              Opacity
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={layer.opacity}
+                                style={{
+                                  background: `linear-gradient(to right, #2563eb ${layer.opacity * 100}%, #dbeafe ${layer.opacity * 100}%)`,
+                                }}
+                                onChange={(e) =>
+                                  updateDataLayer(layer.id, {
+                                    opacity: Number(e.target.value),
+                                  })
+                                }
+                              />
+                              <span>{Math.round(layer.opacity * 100)}%</span>
+                            </label>
+                            <div className="hazard-layer-controls">
                               <label className="field">
-                                Response
+                                Planning role
                                 <select
-                                  value={layer.hazardSeverity || "review"}
+                                  value={layer.hazardType || "context"}
                                   onChange={(event) =>
                                     updateDataLayer(layer.id, {
-                                      hazardSeverity: event.target
-                                        .value as DataLayer["hazardSeverity"],
+                                      hazardType:
+                                        event.target.value === "context"
+                                          ? undefined
+                                          : (event.target
+                                              .value as DataLayer["hazardType"]),
+                                      hazardSeverity:
+                                        event.target.value === "context"
+                                          ? undefined
+                                          : layer.hazardSeverity || "review",
+                                      confidence:
+                                        event.target.value === "context"
+                                          ? undefined
+                                          : layer.confidence || "unknown",
                                     })
                                   }
                                 >
-                                  <option value="information">
-                                    Information
+                                  <option value="context">Context only</option>
+                                  <option value="flood">Flood hazard</option>
+                                  <option value="liquefaction">
+                                    Liquefaction hazard
                                   </option>
-                                  <option value="review">Needs review</option>
-                                  <option value="avoid">Avoid building</option>
+                                  <option value="coastal">
+                                    Coastal hazard
+                                  </option>
+                                  <option value="fault">Fault hazard</option>
+                                  <option value="contamination">
+                                    Contamination hazard
+                                  </option>
                                 </select>
                               </label>
-                              <label className="field">
-                                Confidence
-                                <select
-                                  value={layer.confidence || "unknown"}
-                                  onChange={(event) =>
-                                    updateDataLayer(layer.id, {
-                                      confidence: event.target
-                                        .value as DataLayer["confidence"],
-                                    })
-                                  }
-                                >
-                                  <option value="authoritative">
-                                    Authoritative
-                                  </option>
-                                  <option value="indicative">Indicative</option>
-                                  <option value="unknown">Unknown</option>
-                                </select>
-                              </label>
-                              <label className="field">
-                                Source date
-                                <input
-                                  type="date"
-                                  value={layer.sourceDate || ""}
-                                  onChange={(event) =>
-                                    updateDataLayer(layer.id, {
-                                      sourceDate: event.target.value,
-                                    })
-                                  }
-                                />
-                              </label>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                              {layer.hazardType && (
+                                <>
+                                  <label className="field">
+                                    Response
+                                    <select
+                                      value={layer.hazardSeverity || "review"}
+                                      onChange={(event) =>
+                                        updateDataLayer(layer.id, {
+                                          hazardSeverity: event.target
+                                            .value as DataLayer["hazardSeverity"],
+                                        })
+                                      }
+                                    >
+                                      <option value="information">
+                                        Information
+                                      </option>
+                                      <option value="review">
+                                        Needs review
+                                      </option>
+                                      <option value="avoid">
+                                        Avoid building
+                                      </option>
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    Confidence
+                                    <select
+                                      value={layer.confidence || "unknown"}
+                                      onChange={(event) =>
+                                        updateDataLayer(layer.id, {
+                                          confidence: event.target
+                                            .value as DataLayer["confidence"],
+                                        })
+                                      }
+                                    >
+                                      <option value="authoritative">
+                                        Authoritative
+                                      </option>
+                                      <option value="indicative">
+                                        Indicative
+                                      </option>
+                                      <option value="unknown">Unknown</option>
+                                    </select>
+                                  </label>
+                                  <label className="field">
+                                    Source date
+                                    <input
+                                      type="date"
+                                      value={layer.sourceDate || ""}
+                                      onChange={(event) =>
+                                        updateDataLayer(layer.id, {
+                                          sourceDate: event.target.value,
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </details>
+                    )}
                   </div>
                 )}
               </div>
@@ -2410,8 +2467,8 @@ export default function App() {
             project={viewportProject}
             objectOpacity={projectLayerOpacity}
             selected={selected}
-            visible={visible}
-            opacity={opacity}
+            visible={renderVisible}
+            opacity={renderOpacity}
             draft={draft}
             draftPointer={draftPointer}
             drawingKind={tool}
@@ -3418,6 +3475,7 @@ export default function App() {
                               "wastewater",
                               "stormwater",
                               "electricity",
+                              "gas",
                               "telecom",
                             ] as UtilityNetwork["type"][]
                           ).map((type) => (

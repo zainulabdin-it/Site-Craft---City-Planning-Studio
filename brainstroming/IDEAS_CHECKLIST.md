@@ -31,8 +31,16 @@ Last update: 2026-10-16
 - [x] Compact Layers header; separate Inspector, Assets, Utilities and Warnings panels. [Details](2026-10-16-workspace-panels-and-live-coordinates.md)
 - [x] Larger live pointer coordinates, actual camera status and standard English application help text.
 - [x] Move to location: preserve view mode, frame destinations and approach landmarks from nearby project roads. [Details](2026-10-16-move-to-location.md)
+- [x] Layer workspace foundation: groups, shared visibility/opacity, layer locks, display offsets, exploded spacing and persistence. [Details](2026-10-16-layer-workspace-implementation.md)
+- [x] Gas concept corridor category and separate controls for six utility categories.
 
 ## Abhi baqi / advanced kaam
+
+- [ ] Custom layer membership, building subcategories and more shared style controls.
+- [ ] Explicit utility nodes and links: source, tank/pump, transformer, meter and consumer connections.
+- [ ] Ten-house water/electricity demonstration, source tracing and estimated capacity checks.
+- [ ] Physical pipe depths, underground/section views and service clash detection.
+- [ ] Failure isolation and affected-consumer reports. [Full plan](../docs/GIS_LAYERS_AND_NETWORKS_IMPLEMENTATION.md)
 
 - [ ] Individual object Lock/Unlock, shared road node editing mein bhi protection. [Idea](2026-10-16-object-focus-and-road-editing.md)
 

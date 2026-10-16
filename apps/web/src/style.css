@@ -848,6 +848,105 @@ h2 {
 .project-layer-header > svg.expanded {
   transform: rotate(90deg);
 }
+.layer-workspace {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0;
+}
+.layer-workspace details {
+  font-size: 13px;
+  color: #253b58;
+}
+.layer-workspace .gis-layer-group {
+  margin: 0;
+}
+.layer-workspace summary {
+  margin-bottom: 0;
+}
+.layer-workspace .layer-display-options {
+  margin: 0;
+}
+.layer-control-card > summary > span {
+  font-size: 13px;
+}
+.layer-presentation {
+  padding: 12px;
+  background: #f1f6ff;
+  border: 1px solid #d5e0f3;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+}
+.layer-presentation > label:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.layer-presentation small,
+.layer-control-card > small,
+.layer-source-note {
+  color: #607087;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.gis-layer-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gis-layer-group > summary small,
+.layer-control-card summary > small {
+  margin-left: auto;
+  color: #687b94;
+}
+.gis-layer-group > summary::before {
+  content: "▸";
+}
+.gis-layer-group[open] > summary::before {
+  content: "▾";
+}
+.layer-control-card {
+  border: 1px solid #d6deeb;
+  border-radius: 7px;
+  padding: 8px;
+  margin: 5px 0;
+}
+.layer-control-card > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-height: 30px;
+}
+.layer-control-card summary span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.layer-control-card summary button {
+  padding: 5px;
+  border: 0;
+  color: #415c82;
+}
+.layer-control-card .field,
+.layer-presentation .field {
+  margin: 8px 0;
+}
+.layer-control-card input[type="range"],
+.layer-presentation input[type="range"] {
+  width: 100%;
+  padding: 0;
+}
+.reference-advanced > summary {
+  padding: 12px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
 .layer-group-label {
   margin: 9px 2px 6px;
   color: #718096;

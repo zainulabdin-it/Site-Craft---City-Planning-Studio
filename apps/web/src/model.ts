@@ -213,7 +213,14 @@ export type ScenarioSnapshot = z.infer<typeof scenarioSnapshotSchema>;
 export const utilityNetworkSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
-  type: z.enum(["water", "wastewater", "stormwater", "electricity", "telecom"]),
+  type: z.enum([
+    "water",
+    "wastewater",
+    "stormwater",
+    "electricity",
+    "gas",
+    "telecom",
+  ]),
   sourceRoadId: z.string().uuid().optional(),
   points: z.array(pointSchema).min(2).max(500),
   capacity: z.number().min(0).max(1_000_000),
@@ -224,6 +231,18 @@ export const utilityNetworkSchema = z.object({
   confidence: z.enum(["authoritative", "indicative", "unknown"]),
 });
 export type UtilityNetwork = z.infer<typeof utilityNetworkSchema>;
+export const layerControlSchema = z.object({
+  id: z.string().min(1).max(150),
+  visible: z.boolean(),
+  opacity: z.number().min(0).max(1),
+  locked: z.boolean(),
+  displayOffsetM: z.number().min(-200).max(500),
+});
+export type LayerControl = z.infer<typeof layerControlSchema>;
+export const layerPresentationSchema = z.object({
+  exploded: z.boolean().default(false),
+  spacingM: z.number().min(0).max(100).default(15),
+});
 export const projectSchema = z
   .object({
     schemaVersion: z.literal(4),
@@ -236,6 +255,11 @@ export const projectSchema = z
     zones: z.array(zoneSchema).max(500),
     alternatives: z.array(scenarioSnapshotSchema).max(10),
     utilityNetworks: z.array(utilityNetworkSchema).max(500),
+    layerControls: z.array(layerControlSchema).max(200).default([]),
+    layerPresentation: layerPresentationSchema.default({
+      exploded: false,
+      spacingM: 15,
+    }),
   })
   .strict();
 export type Project = z.infer<typeof projectSchema>;
@@ -277,6 +301,8 @@ export function newProject(name = "Untitled Christchurch site"): Project {
     zones: [],
     alternatives: [],
     utilityNetworks: [],
+    layerControls: [],
+    layerPresentation: { exploded: false, spacingM: 15 },
   };
 }
 export function newObject(

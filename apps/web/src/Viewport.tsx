@@ -18,6 +18,8 @@ import {
 } from "./geometry";
 import { getCustomAssetUrlSync, hydrateCustomAssetUrls } from "./assetStorage";
 import { locationRadiusMeters, streetApproach } from "./navigation";
+import { displayOffset, getLayerControl } from "./layerControls";
+import { applyLayerPresentation } from "./layerRendering";
 export type ViewAction = {
   type:
     | "frame"
@@ -427,9 +429,38 @@ export function Viewport(props: Props) {
       );
     }
     v.scene.requestRender();
+    const appliedLayerOffsets = new WeakMap();
+    let layersDirty = true;
+    let lastControls = latest.current.project.layerControls;
+    let lastPresentation = latest.current.project.layerPresentation;
+    let lastLayerMode = latest.current.viewMode;
+    const removeLayerListener = v.entities.collectionChanged.addEventListener(
+      () => {
+        layersDirty = true;
+      },
+    );
     let lastTelemetry = 0;
     let lastCameraKey = "";
     const stopLoading = () => {
+      const current = latest.current;
+      if (
+        layersDirty ||
+        lastControls !== current.project.layerControls ||
+        lastPresentation !== current.project.layerPresentation ||
+        lastLayerMode !== current.viewMode
+      ) {
+        layersDirty = false;
+        lastControls = current.project.layerControls;
+        lastPresentation = current.project.layerPresentation;
+        lastLayerMode = current.viewMode;
+        applyLayerPresentation(
+          v,
+          current.project,
+          current.viewMode,
+          appliedLayerOffsets,
+        );
+        v.scene.requestRender();
+      }
       if (Date.now() - lastTelemetry >= 150) {
         lastTelemetry = Date.now();
         const info = {
@@ -644,6 +675,7 @@ export function Viewport(props: Props) {
     );
     return () => {
       removePostRender();
+      removeLayerListener();
       window.clearTimeout(loadingFallback);
       window.clearTimeout(initialFrameTimer);
       v.scene.screenSpaceCameraController.enableInputs = true;
@@ -668,8 +700,14 @@ export function Viewport(props: Props) {
         stormwater: "#22c7d9",
         electricity: "#f5b800",
         telecom: "#d946ef",
+        gas: "#e97129",
       };
     for (const network of props.project.utilityNetworks) {
+      const layerControl = getLayerControl(
+        props.project,
+        `utility:${network.type}`,
+      );
+      if (!layerControl.visible) continue;
       const colour = C.Color.fromCssColorString(colours[network.type]);
       v.entities.add({
         id: `_utility:${network.id}`,
@@ -684,14 +722,19 @@ export function Viewport(props: Props) {
           width: props.viewMode === "2d" ? 4 : 3,
           clampToGround: props.viewMode !== "2d",
           material: new C.PolylineDashMaterialProperty({
-            color: colour.withAlpha(0.9),
+            color: colour.withAlpha(0.9 * layerControl.opacity),
             dashLength: 12,
           }),
         },
       });
     }
     v.scene.requestRender();
-  }, [props.project.origin, props.project.utilityNetworks, props.viewMode]);
+  }, [
+    props.project.origin,
+    props.project.utilityNetworks,
+    props.project.layerControls,
+    props.viewMode,
+  ]);
   useEffect(() => {
     const v = viewer.current;
     if (!v) return;
@@ -2251,7 +2294,13 @@ export function Viewport(props: Props) {
       if (typeof entity.id === "string" && entity.id.startsWith("_handle:"))
         v.entities.remove(entity);
     const selected = p.objects.find((o) => o.id === props.selected);
-    if (selected && !props.navigationMode) {
+    if (
+      selected &&
+      !props.navigationMode &&
+      props.visible[selected.kind] &&
+      !getLayerControl(p, `design:${selected.kind}`).locked &&
+      !displayOffset(p, `design:${selected.kind}`, props.viewMode)
+    ) {
       if (selected.kind === "boundary") {
         v.entities.add({
           id: "_selection:boundary",
@@ -3006,7 +3055,16 @@ export function Viewport(props: Props) {
         new C.BoundingSphere(
           C.Cartesian3.fromDegrees(
             ...ll,
-            groundHeight + (o?.elevation ?? 0) + targetHeight,
+            groundHeight +
+              (o?.elevation ?? 0) +
+              targetHeight +
+              (o
+                ? displayOffset(
+                    props.project,
+                    `design:${o.kind}`,
+                    props.viewMode,
+                  )
+                : 0),
           ),
           radius,
         ),
